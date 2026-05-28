@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "edit*": "allow",
+    "bash": {
+        "*":"allow",
+        "pkill*":"allow",
+    },
+    "external_directory": {
+    }, 
+  },
+  "plugin":[
+        "oh-my-openagent@file:///home/starry/.local/share/opencode-packages/omo"
+    ],
+}

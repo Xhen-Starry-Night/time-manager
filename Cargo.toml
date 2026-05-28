@@ -20,3 +20,4 @@ directories = "6"
 thiserror = "2"
 walkdir = "2"
 fsrs = "5"
+iced = { version = "0.14", features = ["tokio"] }
