@@ -122,12 +122,53 @@ impl Default for SessionParams {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum NodeType {
+    Directory,
+    Learning,
+}
+
+impl NodeType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Directory => "directory",
+            Self::Learning => "learning",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "directory" => Some(Self::Directory),
+            "learning" => Some(Self::Learning),
+            _ => None,
+        }
+    }
+
+    pub fn all() -> Vec<Self> {
+        vec![Self::Directory, Self::Learning]
+    }
+
+    pub fn display(&self) -> &'static str {
+        match self {
+            Self::Directory => "分类目录",
+            Self::Learning => "学习节点",
+        }
+    }
+}
+
+impl Default for NodeType {
+    fn default() -> Self {
+        Self::Directory
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Category {
     pub id: i64,
     pub parent_id: Option<i64>,
     pub name: String,
     pub path: String,
+    pub node_type: NodeType,
     pub source: Option<String>,
     pub default_quality: Option<Quality>,
     pub default_understanding_difficulty: Option<Difficulty>,
@@ -139,6 +180,7 @@ pub struct CategoryInsert {
     pub parent_id: Option<i64>,
     pub name: String,
     pub path: String,
+    pub node_type: NodeType,
     pub source: Option<String>,
     pub default_quality: Option<Quality>,
     pub default_understanding_difficulty: Option<Difficulty>,

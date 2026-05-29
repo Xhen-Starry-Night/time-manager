@@ -1,6 +1,6 @@
 use chrono::Utc;
 use time_manager::data::{
-    models::{CategoryInsert, Difficulty, Quality, SessionParams},
+    models::{CategoryInsert, Difficulty, NodeType, Quality, SessionParams},
     Database,
 };
 use time_manager::modules::learning::category::tree::CategoryForest;
@@ -26,6 +26,7 @@ fn test_full_session_flow() {
     let db = test_db();
 
     let lang_id = db.insert_category(&CategoryInsert {
+            node_type: NodeType::Learning,
         parent_id: None,
         name: "语言".into(),
         path: "语言".into(),
@@ -36,6 +37,7 @@ fn test_full_session_flow() {
     }).expect("insert 语言");
 
     let en_id = db.insert_category(&CategoryInsert {
+            node_type: NodeType::Learning,
         parent_id: Some(lang_id),
         name: "英语".into(),
         path: "语言/英语".into(),
@@ -108,6 +110,7 @@ fn test_session_flow_with_preset() {
     let db = test_db();
 
     let cat_id = db.insert_category(&CategoryInsert {
+            node_type: NodeType::Learning,
         parent_id: None,
         name: "Rust".into(),
         path: "Rust".into(),
@@ -137,6 +140,7 @@ fn test_session_flow_with_preset() {
 fn test_multiple_sessions_accumulate() {
     let db = test_db();
     let cat_id = db.insert_category(&CategoryInsert {
+            node_type: NodeType::Learning,
         parent_id: None,
         name: "数学".into(),
         path: "数学".into(),
@@ -187,6 +191,7 @@ fn test_obsidian_import_to_forest() {
         });
 
         db.insert_category(&CategoryInsert {
+            node_type: NodeType::Learning,
             parent_id,
             name: entry.name.clone(),
             path: entry.relative_path.clone(),
@@ -220,6 +225,7 @@ fn test_prediction_update_after_session() {
     let adapter = FsrsAdapter::new();
 
     let cat_id = db.insert_category(&CategoryInsert {
+            node_type: NodeType::Learning,
         parent_id: None,
         name: "Go".into(),
         path: "Go".into(),

@@ -1,10 +1,11 @@
-use crate::data::models::{Category, Difficulty, Quality};
+use crate::data::models::{Category, Difficulty, NodeType, Quality};
 
 #[derive(Debug, Clone)]
 pub struct CategoryNode {
     pub id: i64,
     pub name: String,
     pub path: String,
+    pub node_type: NodeType,
     pub source: Option<String>,
     pub default_quality: Option<Quality>,
     pub default_understanding_difficulty: Option<Difficulty>,
@@ -18,6 +19,7 @@ impl CategoryNode {
             id: cat.id,
             name: cat.name.clone(),
             path: cat.path.clone(),
+            node_type: cat.node_type.clone(),
             source: cat.source.clone(),
             default_quality: cat.default_quality.clone(),
             default_understanding_difficulty: cat.default_understanding_difficulty.clone(),
@@ -74,6 +76,10 @@ impl CategoryNode {
         self.children.is_empty()
     }
 
+    pub fn is_learning(&self) -> bool {
+        matches!(self.node_type, NodeType::Learning)
+    }
+
     pub fn leaf_nodes(&self) -> Vec<&CategoryNode> {
         let mut result = Vec::new();
         if self.is_leaf() {
@@ -82,6 +88,17 @@ impl CategoryNode {
             for child in &self.children {
                 result.extend(child.leaf_nodes());
             }
+        }
+        result
+    }
+
+    pub fn learning_nodes(&self) -> Vec<&CategoryNode> {
+        let mut result = Vec::new();
+        if self.is_learning() {
+            result.push(self);
+        }
+        for child in &self.children {
+            result.extend(child.learning_nodes());
         }
         result
     }
@@ -151,6 +168,15 @@ impl CategoryForest {
         None
     }
 
+    pub fn find_by_path(&self, path: &str) -> Option<&CategoryNode> {
+        for root in &self.roots {
+            if let Some(found) = root.find_by_path(path) {
+                return Some(found);
+            }
+        }
+        None
+    }
+
     pub fn all_nodes(&self) -> Vec<&CategoryNode> {
         let mut result = Vec::new();
         for root in &self.roots {
@@ -163,6 +189,14 @@ impl CategoryForest {
         let mut result = Vec::new();
         for root in &self.roots {
             result.extend(root.leaf_nodes());
+        }
+        result
+    }
+
+    pub fn learning_nodes(&self) -> Vec<&CategoryNode> {
+        let mut result = Vec::new();
+        for root in &self.roots {
+            result.extend(root.learning_nodes());
         }
         result
     }

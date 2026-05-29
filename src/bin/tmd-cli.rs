@@ -126,6 +126,11 @@ fn cmd_import_obsidian(db: &Database, path: Option<&str>) {
             parent_id,
             name: entry.name.clone(),
             path: entry.relative_path.clone(),
+            node_type: if entry.is_dir {
+                time_manager::data::models::NodeType::Directory
+            } else {
+                time_manager::data::models::NodeType::Learning
+            },
             source: Some("obsidian".into()),
             default_quality: None,
             default_understanding_difficulty: None,

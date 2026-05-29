@@ -1,13 +1,13 @@
-use time_manager::data::models::{Category, Difficulty, Quality};
+use time_manager::data::models::{Category, Difficulty, NodeType, Quality};
 use time_manager::modules::learning::category::tree::{CategoryForest, CategoryNode};
 use time_manager::modules::learning::timer::state_machine::TimerStateMachine;
 
 fn sample_categories() -> Vec<Category> {
     vec![
-        Category { id: 1, parent_id: None, name: "语言".into(), path: "语言".into(), source: None, default_quality: None, default_understanding_difficulty: None, default_memory_difficulty: None },
-        Category { id: 2, parent_id: Some(1), name: "英语".into(), path: "语言/英语".into(), source: None, default_quality: Some(Quality::High), default_understanding_difficulty: None, default_memory_difficulty: None },
-        Category { id: 3, parent_id: Some(2), name: "六级".into(), path: "语言/英语/六级".into(), source: None, default_quality: None, default_understanding_difficulty: None, default_memory_difficulty: None },
-        Category { id: 4, parent_id: None, name: "数学".into(), path: "数学".into(), source: None, default_quality: None, default_understanding_difficulty: None, default_memory_difficulty: None },
+        Category { id: 1, parent_id: None, name: "语言".into(), path: "语言".into(), node_type: NodeType::Learning, source: None, default_quality: None, default_understanding_difficulty: None, default_memory_difficulty: None },
+        Category { id: 2, parent_id: Some(1), name: "英语".into(), path: "语言/英语".into(), node_type: NodeType::Learning, source: None, default_quality: Some(Quality::High), default_understanding_difficulty: None, default_memory_difficulty: None },
+        Category { id: 3, parent_id: Some(2), name: "六级".into(), path: "语言/英语/六级".into(), node_type: NodeType::Learning, source: None, default_quality: None, default_understanding_difficulty: None, default_memory_difficulty: None },
+        Category { id: 4, parent_id: None, name: "数学".into(), path: "数学".into(), node_type: NodeType::Learning, source: None, default_quality: None, default_understanding_difficulty: None, default_memory_difficulty: None },
     ]
 }
 
@@ -86,6 +86,7 @@ fn test_forest_deep_nesting() {
     let mut cats = Vec::new();
     for i in 0..20 {
         cats.push(Category {
+            node_type: NodeType::Learning,
             id: i as i64 + 1,
             parent_id: if i == 0 { None } else { Some(i as i64) },
             name: format!("L{}", i),
@@ -107,10 +108,10 @@ fn test_forest_deep_nesting() {
 #[test]
 fn test_forest_multiple_children() {
     let cats = vec![
-        Category { id: 1, parent_id: None, name: "Root".into(), path: "Root".into(), source: None, default_quality: None, default_understanding_difficulty: None, default_memory_difficulty: None },
-        Category { id: 2, parent_id: Some(1), name: "A".into(), path: "Root/A".into(), source: None, default_quality: None, default_understanding_difficulty: None, default_memory_difficulty: None },
-        Category { id: 3, parent_id: Some(1), name: "B".into(), path: "Root/B".into(), source: None, default_quality: None, default_understanding_difficulty: None, default_memory_difficulty: None },
-        Category { id: 4, parent_id: Some(1), name: "C".into(), path: "Root/C".into(), source: None, default_quality: None, default_understanding_difficulty: None, default_memory_difficulty: None },
+        Category { id: 1, parent_id: None, name: "Root".into(), path: "Root".into(), node_type: NodeType::Learning, source: None, default_quality: None, default_understanding_difficulty: None, default_memory_difficulty: None },
+        Category { id: 2, parent_id: Some(1), name: "A".into(), path: "Root/A".into(), node_type: NodeType::Learning, source: None, default_quality: None, default_understanding_difficulty: None, default_memory_difficulty: None },
+        Category { id: 3, parent_id: Some(1), name: "B".into(), path: "Root/B".into(), node_type: NodeType::Learning, source: None, default_quality: None, default_understanding_difficulty: None, default_memory_difficulty: None },
+        Category { id: 4, parent_id: Some(1), name: "C".into(), path: "Root/C".into(), node_type: NodeType::Learning, source: None, default_quality: None, default_understanding_difficulty: None, default_memory_difficulty: None },
     ];
     let forest = CategoryForest::from_categories(&cats);
     assert_eq!(forest.roots[0].children.len(), 3);

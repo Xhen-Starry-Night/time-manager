@@ -70,7 +70,8 @@ impl PredictionAlgorithm for FsrsAdapter {
             due: interval_days,
         };
 
-        let next_review = Utc::now() + chrono::Duration::days(interval_days as i64);
+        let interval_secs = (interval_days * 86400.0).round() as i64;
+        let next_review = Utc::now() + chrono::Duration::seconds(interval_secs);
 
         PredictionResult {
             next_review,

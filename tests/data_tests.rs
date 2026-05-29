@@ -1,6 +1,6 @@
 use chrono::Utc;
 use time_manager::data::{
-    models::{CategoryInsert, Difficulty, PauseRecord, PredictionStateInsert, Quality, SessionInsert, SessionParams},
+    models::{CategoryInsert, Difficulty, NodeType, PauseRecord, PredictionStateInsert, Quality, SessionInsert, SessionParams},
     Database,
 };
 
@@ -17,6 +17,7 @@ fn test_db() -> Database {
 
 fn insert_root(db: &Database, name: &str) -> i64 {
     db.insert_category(&CategoryInsert {
+            node_type: NodeType::Learning,
         parent_id: None,
         name: name.into(),
         path: name.into(),
@@ -29,6 +30,7 @@ fn insert_root(db: &Database, name: &str) -> i64 {
 
 fn insert_child(db: &Database, parent_id: i64, name: &str, path: &str) -> i64 {
     db.insert_category(&CategoryInsert {
+            node_type: NodeType::Learning,
         parent_id: Some(parent_id),
         name: name.into(),
         path: path.into(),
@@ -84,6 +86,7 @@ fn test_category_crud() {
 fn test_category_with_defaults() {
     let db = test_db();
     let id = db.insert_category(&CategoryInsert {
+            node_type: NodeType::Learning,
         parent_id: None,
         name: "Rust".into(),
         path: "Rust".into(),
@@ -136,6 +139,7 @@ fn test_category_duplicate_path_rejected() {
     let db = test_db();
     let _ = insert_root(&db, "X");
     let result = db.insert_category(&CategoryInsert {
+            node_type: NodeType::Learning,
         parent_id: None,
         name: "X2".into(),
         path: "X".into(),

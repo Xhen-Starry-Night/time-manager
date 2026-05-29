@@ -21,6 +21,7 @@ impl Database {
             db_path: path.to_path_buf(),
         };
         db.create_tables()?;
+        db.migrate()?;
         Ok(db)
     }
 
@@ -52,6 +53,7 @@ impl Database {
                  parent_id                       INTEGER,
                  name                            TEXT NOT NULL,
                  path                            TEXT NOT NULL UNIQUE,
+                 node_type                      TEXT NOT NULL DEFAULT 'directory',
                  source                          TEXT,
                  default_quality                 TEXT,
                  default_understanding_difficulty TEXT,
@@ -94,21 +96,35 @@ impl Database {
         Ok(())
     }
 
+    fn migrate(&self) -> Result<()> {
+        let has_node_type: bool = self.conn
+            .prepare("SELECT node_type FROM categories LIMIT 0")
+            .is_ok();
+
+        if !has_node_type {
+            self.conn.execute_batch(
+                "ALTER TABLE categories ADD COLUMN node_type TEXT NOT NULL DEFAULT 'directory';",
+            )?;
+        }
+
+        Ok(())
+    }
+
     pub fn insert_category(&self, cat: &crate::data::models::CategoryInsert) -> Result<i64> {
         let q = cat.default_quality.as_ref().map(|q| q.as_str());
         let ud = cat.default_understanding_difficulty.as_ref().map(|d| d.as_str());
         let md = cat.default_memory_difficulty.as_ref().map(|d| d.as_str());
         self.conn.execute(
-            "INSERT INTO categories (parent_id, name, path, source, default_quality, default_understanding_difficulty, default_memory_difficulty)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            params![cat.parent_id, cat.name, cat.path, cat.source, q, ud, md],
+            "INSERT INTO categories (parent_id, name, path, node_type, source, default_quality, default_understanding_difficulty, default_memory_difficulty)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![cat.parent_id, cat.name, cat.path, cat.node_type.as_str(), cat.source, q, ud, md],
         )?;
         Ok(self.conn.last_insert_rowid())
     }
 
     pub fn get_category(&self, id: i64) -> Result<crate::data::models::Category> {
         self.conn.query_row(
-            "SELECT id, parent_id, name, path, source, default_quality, default_understanding_difficulty, default_memory_difficulty
+            "SELECT id, parent_id, name, path, node_type, source, default_quality, default_understanding_difficulty, default_memory_difficulty
              FROM categories WHERE id = ?1",
             params![id],
             map_category_row,
@@ -117,7 +133,7 @@ impl Database {
 
     pub fn get_all_categories(&self) -> Result<Vec<crate::data::models::Category>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, parent_id, name, path, source, default_quality, default_understanding_difficulty, default_memory_difficulty
+            "SELECT id, parent_id, name, path, node_type, source, default_quality, default_understanding_difficulty, default_memory_difficulty
              FROM categories ORDER BY path",
         )?;
         let rows = stmt.query_map([], map_category_row)?;
@@ -127,12 +143,12 @@ impl Database {
     pub fn get_children(&self, parent_id: Option<i64>) -> Result<Vec<crate::data::models::Category>> {
         let mut stmt = if parent_id.is_some() {
             self.conn.prepare(
-                "SELECT id, parent_id, name, path, source, default_quality, default_understanding_difficulty, default_memory_difficulty
+                "SELECT id, parent_id, name, path, node_type, source, default_quality, default_understanding_difficulty, default_memory_difficulty
                  FROM categories WHERE parent_id = ?1 ORDER BY name",
             )?
         } else {
             self.conn.prepare(
-                "SELECT id, parent_id, name, path, source, default_quality, default_understanding_difficulty, default_memory_difficulty
+                "SELECT id, parent_id, name, path, node_type, source, default_quality, default_understanding_difficulty, default_memory_difficulty
                  FROM categories WHERE parent_id IS NULL ORDER BY name",
             )?
         };
@@ -358,15 +374,18 @@ fn parse_difficulty(s: &str) -> Option<crate::data::models::Difficulty> {
 }
 
 fn map_category_row(row: &rusqlite::Row<'_>) -> std::result::Result<crate::data::models::Category, rusqlite::Error> {
+    let node_type_str: String = row.get(4)?;
     Ok(crate::data::models::Category {
         id: row.get(0)?,
         parent_id: row.get(1)?,
         name: row.get(2)?,
         path: row.get(3)?,
-        source: row.get(4)?,
-        default_quality: row.get::<_, Option<String>>(5)?.as_deref().and_then(parse_quality),
-        default_understanding_difficulty: row.get::<_, Option<String>>(6)?.as_deref().and_then(parse_difficulty),
-        default_memory_difficulty: row.get::<_, Option<String>>(7)?.as_deref().and_then(parse_difficulty),
+        node_type: crate::data::models::NodeType::from_str(&node_type_str)
+            .unwrap_or_default(),
+        source: row.get(5)?,
+        default_quality: row.get::<_, Option<String>>(6)?.as_deref().and_then(parse_quality),
+        default_understanding_difficulty: row.get::<_, Option<String>>(7)?.as_deref().and_then(parse_difficulty),
+        default_memory_difficulty: row.get::<_, Option<String>>(8)?.as_deref().and_then(parse_difficulty),
     })
 }
 
