@@ -1,5 +1,6 @@
 use crate::data::models::PauseRecord;
 use chrono::{DateTime, Utc};
+use tracing::{debug, trace, warn};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TimerState {
@@ -33,50 +34,59 @@ pub struct StoppedSession {
 
 impl TimerStateMachine {
     pub fn new() -> Self {
+        trace!("Creating new TimerStateMachine");
         Self {
             state: TimerState::Idle,
             category_id: None,
         }
     }
 
+    #[tracing::instrument(level = "info", name = "timer_start", skip(self), fields(category_id))]
     pub fn start(&mut self, category_id: i64) -> Result<(), &'static str> {
         match &self.state {
             TimerState::Idle => {
+                debug!("Starting timer for category {}", category_id);
                 self.state = TimerState::Running {
                     start_time: Utc::now(),
                     pause_total_secs: 0,
                     pauses: Vec::new(),
                 };
                 self.category_id = Some(category_id);
+                tracing::Span::current().record("category_id", category_id);
+                debug!("Timer state transition: Idle -> Running");
                 Ok(())
             }
-            _ => Err("cannot start: timer is not idle"),
+            _ => {
+                warn!("Cannot start timer: not idle (current state: {:?})", std::mem::discriminant(&self.state));
+                Err("cannot start: timer is not idle")
+            }
         }
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub fn pause(&mut self) -> Result<(), &'static str> {
         match &self.state {
-            TimerState::Running { .. } => {
+            TimerState::Running { start_time, pause_total_secs, pauses } => {
                 let now = Utc::now();
-                if let TimerState::Running {
-                    start_time,
-                    pause_total_secs,
-                    pauses,
-                } = &self.state
-                {
-                    self.state = TimerState::Paused {
-                        start_time: *start_time,
-                        pause_total_secs: *pause_total_secs,
-                        pauses: pauses.clone(),
-                        pause_start: now,
-                    };
-                }
+                debug!("Pausing timer at {}, total pause so far: {}s", now.format("%H:%M:%S"), pause_total_secs);
+
+                self.state = TimerState::Paused {
+                    start_time: *start_time,
+                    pause_total_secs: *pause_total_secs,
+                    pauses: pauses.clone(),
+                    pause_start: now,
+                };
+                debug!("Timer state transition: Running -> Paused");
                 Ok(())
             }
-            _ => Err("cannot pause: timer is not running"),
+            _ => {
+                warn!("Cannot pause timer: not running");
+                Err("cannot pause: timer is not running")
+            }
         }
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     pub fn resume(&mut self) -> Result<(), &'static str> {
         match &self.state {
             TimerState::Paused { .. } => {
@@ -89,36 +99,51 @@ impl TimerStateMachine {
                 } = std::mem::replace(&mut self.state, TimerState::Idle)
                 {
                     let pause_secs = (now - pause_start).num_seconds().max(0);
+                    debug!("Resuming timer after {}s pause", pause_secs);
+
                     pauses.push(PauseRecord {
                         pause_start,
                         resume_time: now,
                     });
+                    trace!("Pause record added: {} pauses total", pauses.len());
+
                     self.state = TimerState::Running {
                         start_time,
                         pause_total_secs: pause_total_secs + pause_secs,
                         pauses,
                     };
+                    debug!("Timer state transition: Paused -> Running (total pause: {}s)", pause_total_secs + pause_secs);
                 }
                 Ok(())
             }
-            _ => Err("cannot resume: timer is not paused"),
+            _ => {
+                warn!("Cannot resume timer: not paused");
+                Err("cannot resume: timer is not paused")
+            }
         }
     }
 
+    #[tracing::instrument(level = "info", skip(self))]
     pub fn stop(&mut self) -> Result<StoppedSession, &'static str> {
+        debug!("Stopping timer");
+
         let now = Utc::now();
         let (start_time, pause_total_secs, pauses, _extra_pause) = match &self.state {
             TimerState::Running {
                 start_time,
                 pause_total_secs,
                 pauses,
-            } => (*start_time, *pause_total_secs, pauses.clone(), 0i64),
+            } => {
+                trace!("Stopping from Running state");
+                (*start_time, *pause_total_secs, pauses.clone(), 0i64)
+            }
             TimerState::Paused {
                 start_time,
                 pause_total_secs,
                 pauses,
                 pause_start,
             } => {
+                trace!("Stopping from Paused state");
                 let extra = (now - *pause_start).num_seconds().max(0);
                 let mut p = pauses.clone();
                 p.push(PauseRecord {
@@ -127,7 +152,10 @@ impl TimerStateMachine {
                 });
                 (*start_time, *pause_total_secs + extra, p, 0)
             }
-            TimerState::Idle => return Err("cannot stop: timer is idle"),
+            TimerState::Idle => {
+                warn!("Cannot stop timer: idle");
+                return Err("cannot stop: timer is idle");
+            }
         };
 
         let cat_id = self.category_id.unwrap_or(0);
@@ -136,6 +164,11 @@ impl TimerStateMachine {
 
         let elapsed = (now - start_time).num_seconds().max(0);
         let effective = (elapsed - pause_total_secs).max(0);
+
+        debug!(
+            "Timer stopped: category={}, elapsed={}s, paused={}s, effective={}s",
+            cat_id, elapsed, pause_total_secs, effective
+        );
 
         Ok(StoppedSession {
             category_id: cat_id,

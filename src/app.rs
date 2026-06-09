@@ -1,6 +1,7 @@
 use chrono::Utc;
 use iced::widget::{button, column, container, row, scrollable, text, text_input};
 use iced::{Color, Element, Fill, Task};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::data::models::{CategoryInsert, Difficulty, NodeType, Quality, SessionParams};
 use crate::data::Database;
@@ -107,11 +108,24 @@ pub struct PendingSession {
 
 impl App {
     pub fn new() -> Self {
+        info!("Initializing Time Manager App");
+
         let db = Database::open_default().expect("failed to open database");
+        debug!("Database opened successfully");
+
         let cats = db.get_all_categories().unwrap_or_default();
+        trace!("Loaded {} categories", cats.len());
+
         let forest = CategoryForest::from_categories(&cats);
+        debug!("Category forest built with {} root nodes", forest.roots.len());
+
         let global_params = defaults::load_global_params(&db);
+        trace!("Global params loaded");
+
         let fsrs = FsrsAdapter::new();
+        debug!("FSRS adapter initialized");
+
+        info!("App initialization complete");
 
         Self {
             db,
@@ -130,8 +144,11 @@ impl App {
     }
 
     fn refresh_forest(&mut self) {
+        debug!("Refreshing category forest");
         let cats = self.db.get_all_categories().unwrap_or_default();
+        trace!("Loaded {} categories for refresh", cats.len());
         self.forest = CategoryForest::from_categories(&cats);
+        debug!("Forest refreshed with {} roots", self.forest.roots.len());
     }
 
     fn is_timer_active(&self) -> bool {
@@ -211,16 +228,21 @@ impl App {
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
+        trace!("Processing message: {:?}", std::mem::discriminant(&message));
+
         match message {
             Message::SwitchScreen(screen) => {
+                info!("Switching screen to: {:?}", screen);
                 self.selected_category_id = None;
                 self.screen = screen;
             }
             Message::SelectCategory(id) => {
+                debug!("Selecting category: {}", id);
                 self.selected_category_id = Some(id);
             }
 
             Message::OpenNewCategory => {
+                debug!("Opening new category dialog, parent: {:?}", self.selected_category_id);
                 self.dialog = Some(Dialog::NewCategory {
                     parent_id: self.selected_category_id,
                     name: String::new(),
@@ -228,16 +250,20 @@ impl App {
                 });
             }
             Message::OpenSearch => {
+                debug!("Opening search dialog");
                 self.dialog = Some(Dialog::Search {
                     query: String::new(),
                 });
             }
             Message::OpenImport => {
+                debug!("Opening Obsidian import dialog");
                 self.dialog = Some(Dialog::ObsidianImport {
                     path: String::new(),
                 });
             }
-            Message::OpenSettings => {}
+            Message::OpenSettings => {
+                trace!("Settings opened (not implemented)");
+            }
 
             Message::SetNewCategoryName(name) => {
                 if let Some(Dialog::NewCategory { name: ref mut n, .. }) = self.dialog {
@@ -274,6 +300,8 @@ impl App {
                             name.trim().to_string()
                         };
 
+                        info!("Creating category: '{}' at path '{}' (type: {:?})", name.trim(), path, node_type);
+
                         let insert = CategoryInsert {
                             parent_id,
                             name: name.trim().to_string(),
@@ -286,8 +314,13 @@ impl App {
                         };
 
                         if self.db.insert_category(&insert).is_ok() {
+                            debug!("Category created successfully");
                             self.refresh_forest();
+                        } else {
+                            error!("Failed to create category");
                         }
+                    } else {
+                        warn!("Attempted to create category with empty name");
                     }
                 }
             }
@@ -295,8 +328,14 @@ impl App {
             Message::ImportObsidian => {
                 if let Some(Dialog::ObsidianImport { path }) = self.dialog.take() {
                     if !path.trim().is_empty() {
+                        info!("Starting Obsidian import from: {}", path);
+
                         let vault_path = std::path::Path::new(&path);
                         let entries = vault_parser::parse_vault(vault_path);
+                        debug!("Found {} entries in vault", entries.len());
+
+                        let mut dir_count = 0;
+                        let mut file_count = 0;
 
                         for entry in &entries {
                             if entry.is_dir {
@@ -320,7 +359,10 @@ impl App {
                                         default_understanding_difficulty: None,
                                         default_memory_difficulty: None,
                                     };
-                                    self.db.insert_category(&insert).ok();
+                                    if self.db.insert_category(&insert).is_ok() {
+                                        dir_count += 1;
+                                        trace!("Imported directory: {}", entry.relative_path);
+                                    }
                                 }
                             }
                         }
@@ -347,22 +389,28 @@ impl App {
                                         default_understanding_difficulty: None,
                                         default_memory_difficulty: None,
                                     };
-                                    self.db.insert_category(&insert).ok();
+                                    if self.db.insert_category(&insert).is_ok() {
+                                        file_count += 1;
+                                        trace!("Imported learning node: {}", entry.relative_path);
+                                    }
                                 }
                             }
                         }
 
+                        info!("Obsidian import complete: {} directories, {} learning nodes", dir_count, file_count);
                         self.refresh_forest();
                     }
                 }
             }
 
             Message::DismissDialog => {
+                debug!("Dismissing dialog");
                 self.dialog = None;
             }
 
             Message::DeleteCategory(id) => {
                 if let Some(node) = self.forest.find(id) {
+                    debug!("Requesting delete confirmation for category: {} (id: {})", node.name, id);
                     self.dialog = Some(Dialog::ConfirmDeleteCategory {
                         id,
                         name: node.name.clone(),
@@ -371,16 +419,22 @@ impl App {
             }
             Message::ConfirmDeleteCategory => {
                 if let Some(Dialog::ConfirmDeleteCategory { id, .. }) = self.dialog.take() {
+                    info!("Deleting category id: {}", id);
                     if self.db.delete_category(id).is_ok() {
+                        debug!("Category deleted successfully");
                         self.refresh_forest();
                         if self.selected_category_id == Some(id) {
                             self.selected_category_id = None;
                         }
+                    } else {
+                        error!("Failed to delete category {}", id);
                     }
                 }
             }
 
             Message::StartTimer(category_id) => {
+                info!("Starting timer for category: {}", category_id);
+
                 let node = self.forest.find(category_id);
                 let params = resolve_params(
                     &self.global_params,
@@ -388,18 +442,28 @@ impl App {
                     node.and_then(|n| n.default_understanding_difficulty.as_ref()),
                     node.and_then(|n| n.default_memory_difficulty.as_ref()),
                 );
+
+                debug!("Timer params resolved: quality={:?}, ud={:?}, md={:?}",
+                    params.quality, params.understanding_difficulty, params.memory_difficulty);
+
                 self.current_params = params;
                 self.timer.start(category_id).ok();
                 self.return_screen = self.screen.clone();
+                debug!("Timer started, return screen: {:?}", self.return_screen);
             }
             Message::PauseTimer => {
+                debug!("Pausing timer");
                 self.timer.pause().ok();
             }
             Message::ResumeTimer => {
+                debug!("Resuming timer");
                 self.timer.resume().ok();
             }
             Message::StopTimer => {
                 if let Ok(stopped) = self.timer.stop() {
+                    info!("Timer stopped: category={}, duration={}s",
+                        stopped.category_id, stopped.duration_secs);
+
                     let path = self
                         .forest
                         .find(stopped.category_id)
@@ -411,10 +475,14 @@ impl App {
                         duration_secs: stopped.duration_secs,
                         params: self.current_params.clone(),
                     });
+                    debug!("Pending session created, awaiting confirmation");
                 }
             }
             Message::ConfirmSession => {
                 if let Some(pending) = self.pending_session.take() {
+                    info!("Confirming session: category={}, duration={}s, quality={:?}",
+                        pending.category_id, pending.duration_secs, pending.params.quality);
+
                     let now = Utc::now();
                     let insert = crate::data::models::SessionInsert {
                         category_id: pending.category_id,
@@ -426,9 +494,13 @@ impl App {
                         note: None,
                     };
                     if self.db.insert_session(&insert).is_ok() {
+                        debug!("Session saved to database");
+
                         let pred = self
                             .fsrs
                             .predict_next_review(&[], &[], &pending.params.quality);
+                        debug!("FSRS prediction: next_review={}", pred.next_review.format("%Y-%m-%d"));
+
                         self.db
                             .upsert_prediction_state(&crate::data::models::PredictionStateInsert {
                                 category_id: pending.category_id,
@@ -438,16 +510,22 @@ impl App {
                                 algorithm_state: pred.state_bytes,
                             })
                             .ok();
+
+                        info!("Session complete and prediction updated");
+                    } else {
+                        error!("Failed to save session");
                     }
                 }
                 self.screen = self.return_screen.clone();
                 self.selected_category_id = None;
             }
             Message::CancelSession => {
+                info!("Session cancelled");
                 self.pending_session = None;
             }
 
             Message::SetQuality(q) => {
+                trace!("Setting quality: {:?}", q);
                 if let Some(p) = &mut self.pending_session {
                     p.params.quality = q;
                 } else {
@@ -455,6 +533,7 @@ impl App {
                 }
             }
             Message::SetUnderstandingDifficulty(d) => {
+                trace!("Setting understanding difficulty: {:?}", d);
                 if let Some(p) = &mut self.pending_session {
                     p.params.understanding_difficulty = d;
                 } else {
@@ -462,6 +541,7 @@ impl App {
                 }
             }
             Message::SetMemoryDifficulty(d) => {
+                trace!("Setting memory difficulty: {:?}", d);
                 if let Some(p) = &mut self.pending_session {
                     p.params.memory_difficulty = d;
                 } else {
@@ -469,6 +549,7 @@ impl App {
                 }
             }
             Message::SetCompletionRate(r) => {
+                trace!("Setting completion rate: {}%", r);
                 if let Some(p) = &mut self.pending_session {
                     p.params.completion_rate = r;
                 } else {
@@ -476,6 +557,7 @@ impl App {
                 }
             }
             Message::ApplyPreset(idx) => {
+                debug!("Applying preset index: {}", idx);
                 let presets = defaults::load_presets(&self.db);
                 if let Some(preset) = presets.get(idx) {
                     if let Some(p) = &mut self.pending_session {
@@ -483,16 +565,20 @@ impl App {
                     } else {
                         apply_preset(preset, &mut self.current_params);
                     }
+                    trace!("Preset '{}' applied", preset.name);
                 }
             }
 
-            Message::RefreshReviewDashboard => {}
+            Message::RefreshReviewDashboard => {
+                trace!("Review dashboard refresh requested");
+            }
             Message::Tick => {
                 if self.timer.is_running() {
                     self.timer_display_secs = self.timer.effective_secs();
                 }
             }
             Message::BackFromTimer => {
+                debug!("Returning from timer to previous screen");
                 self.screen = self.return_screen.clone();
                 self.selected_category_id = None;
             }

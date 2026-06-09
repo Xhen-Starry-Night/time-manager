@@ -1,4 +1,5 @@
 use crate::data::models::{Category, Difficulty, NodeType, Quality};
+use tracing::{debug, trace};
 
 #[derive(Debug, Clone)]
 pub struct CategoryNode {
@@ -14,7 +15,9 @@ pub struct CategoryNode {
 }
 
 impl CategoryNode {
+    #[tracing::instrument(level = "trace", skip(cat))]
     pub fn from_category(cat: &Category) -> Self {
+        trace!("Creating CategoryNode from category id={}", cat.id);
         Self {
             id: cat.id,
             name: cat.name.clone(),
@@ -109,11 +112,15 @@ pub struct CategoryForest {
 }
 
 impl CategoryForest {
+    #[tracing::instrument(level = "debug", skip(categories))]
     pub fn from_categories(categories: &[Category]) -> Self {
+        debug!("Building CategoryForest from {} categories", categories.len());
+
         let mut nodes: std::collections::HashMap<i64, CategoryNode> = categories
             .iter()
             .map(|c| (c.id, CategoryNode::from_category(c)))
             .collect();
+        trace!("Created {} node entries", nodes.len());
 
         let mut root_ids = Vec::new();
         let mut children_map: std::collections::HashMap<i64, Vec<i64>> = std::collections::HashMap::new();
@@ -121,8 +128,10 @@ impl CategoryForest {
         for cat in categories {
             if let Some(parent_id) = cat.parent_id {
                 children_map.entry(parent_id).or_default().push(cat.id);
+                trace!("Category {} -> parent {}", cat.id, parent_id);
             } else {
                 root_ids.push(cat.id);
+                trace!("Root category: {}", cat.id);
             }
         }
 
@@ -133,6 +142,7 @@ impl CategoryForest {
         ) -> Option<CategoryNode> {
             let mut node = nodes.remove(&root_id)?;
             if let Some(child_ids) = children_map.get(&root_id) {
+                trace!("Building children for node {}: {} children", root_id, child_ids.len());
                 for &cid in child_ids {
                     if let Some(child) = build_tree(cid, nodes, children_map) {
                         node.children.push(child);
@@ -147,6 +157,7 @@ impl CategoryForest {
             .filter_map(|rid| build_tree(rid, &mut nodes, &children_map))
             .collect();
 
+        debug!("CategoryForest built with {} root nodes", roots.len());
         Self { roots }
     }
 
