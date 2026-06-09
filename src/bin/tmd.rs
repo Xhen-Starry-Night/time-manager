@@ -145,15 +145,28 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
         }
 
         TimerStart { name: _ } => {
-            println!("Timer not implemented yet - use GUI");
+            let mut manager = time_manager::timer::TimerManager::new(data_dir);
+            manager
+                .start()
+                .map_err(|e| time_manager::data::DataError::InvalidData(e))?;
+            println!("Timer started: {}", manager.get_state().elapsed_string());
         }
 
         TimerPause => {
-            println!("Timer not implemented yet - use GUI");
+            let mut manager = time_manager::timer::TimerManager::new(data_dir);
+            manager
+                .pause()
+                .map_err(|e| time_manager::data::DataError::InvalidData(e))?;
+            println!("Timer paused: {}", manager.get_state().elapsed_string());
         }
 
         TimerStop => {
-            println!("Timer not implemented yet - use GUI");
+            let mut manager = time_manager::timer::TimerManager::new(data_dir);
+            let timer_file = manager
+                .stop()
+                .map_err(|e| time_manager::data::DataError::InvalidData(e))?;
+            println!("Timer stopped. Saved to: {:?}", timer_file);
+            println!("Duration: {}", manager.get_state().elapsed_string());
         }
 
         TimerGet { name } => {
@@ -222,8 +235,77 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
             }
         }
 
-        ReviewList { urgency: _ } => {
-            println!("Review list not implemented yet");
+        ReviewList { urgency } => {
+            let fs = DataFs::init(data_dir)?;
+            let trees = fs.list_trees()?;
+
+            let mut cards_with_urgency = Vec::new();
+
+            for tree in trees {
+                let cards = fs.list_cards(&tree)?;
+                for card in cards {
+                    if let Some(last_record) = card.review_records.last() {
+                        let state = time_manager::fsrs::FsrsPredictor::bytes_to_memory_state(
+                            &last_record.fsrs_state_bytes,
+                        );
+                        if let Some(state) = state {
+                            let predictor = time_manager::fsrs::FsrsPredictor::new()
+                                .map_err(|e| time_manager::data::DataError::InvalidData(e))?;
+                            let (interval, _) = predictor
+                                .predict_next_review(
+                                    Some(state),
+                                    time_manager::data::models::MemoryQuality::Good,
+                                    0,
+                                    0.9,
+                                )
+                                .map_err(|e| time_manager::data::DataError::InvalidData(e))?;
+
+                            let next_review =
+                                last_record.reviewed_at + chrono::Duration::days(interval as i64);
+                            let urgency_level =
+                                time_manager::fsrs::FsrsPredictor::calculate_urgency(next_review);
+
+                            cards_with_urgency.push((
+                                card.path.clone(),
+                                urgency_level,
+                                next_review,
+                            ));
+                        }
+                    }
+                }
+            }
+
+            cards_with_urgency.sort_by(|a, b| b.1.cmp(&a.1));
+
+            if let Some(filter) = urgency {
+                let filter_level = match filter.as_str() {
+                    "overdue" => Some(3),
+                    "today" => Some(2),
+                    "three-days" => Some(1),
+                    _ => None,
+                };
+                if let Some(level) = filter_level {
+                    cards_with_urgency.retain(|(_, urgency, _)| *urgency >= level);
+                }
+            }
+
+            for (path, urgency, next_review) in cards_with_urgency {
+                let urgency_icon = match urgency {
+                    3 => "🔴",
+                    2 => "🟡",
+                    1 => "🟢",
+                    _ => "⚪",
+                };
+                let days_until = (next_review - chrono::Utc::now()).num_days();
+                let time_str = if days_until < 0 {
+                    format!("已过期 {} 天", -days_until)
+                } else if days_until == 0 {
+                    "今日到期".to_string()
+                } else {
+                    format!("{} 天后", days_until)
+                };
+                println!("{} {}    {}", urgency_icon, path, time_str);
+            }
         }
     }
 
