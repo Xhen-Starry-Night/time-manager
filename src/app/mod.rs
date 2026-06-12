@@ -268,7 +268,45 @@ impl App {
                         self.category_tab.selected_path.as_deref(),
                     ).map(|path| Message::CardSelected(path));
                     
-                    container(scrollable(tree_element))
+                    let left_panel = container(scrollable(tree_element))
+                        .width(Length::FillPortion(2))
+                        .height(Length::Fill);
+                    
+                    let right_panel = if let Some(ref selected_path) = self.category_tab.selected_path {
+                        let card_data = self.review_tab.cards.iter()
+                            .find(|(path, _)| path == selected_path);
+                        
+                        if let Some((path, card)) = card_data {
+                            container(
+                                crate::gui::components::CardDetail::view(path, card)
+                                    .map(|_| Message::ClearError)
+                            )
+                            .width(Length::FillPortion(3))
+                            .height(Length::Fill)
+                            .padding(16)
+                        } else {
+                            container(
+                                text("选择卡片查看详情")
+                                    .size(16)
+                            )
+                            .width(Length::FillPortion(3))
+                            .height(Length::Fill)
+                            .center_x(Length::Fill)
+                            .center_y(Length::Fill)
+                        }
+                    } else {
+                        container(
+                            text("选择卡片查看详情")
+                                .size(16)
+                        )
+                        .width(Length::FillPortion(3))
+                        .height(Length::Fill)
+                        .center_x(Length::Fill)
+                        .center_y(Length::Fill)
+                    };
+                    
+                    row![left_panel, right_panel]
+                        .spacing(1)
                         .width(Length::Fill)
                         .height(Length::Fill)
                         .into()
