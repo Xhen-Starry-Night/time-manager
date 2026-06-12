@@ -4,6 +4,7 @@ use walkdir::WalkDir;
 use crate::data::models::{Card, Preset, Timer, Todo};
 use crate::data::{DataError, Result};
 
+#[derive(Clone)]
 pub struct DataFs {
     data_dir: PathBuf,
 }

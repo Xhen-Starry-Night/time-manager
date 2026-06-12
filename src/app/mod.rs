@@ -1,11 +1,15 @@
 use std::path::PathBuf;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 use iced::{application, Element, Task};
-use iced::widget::{button, column, row, text, container, rule};
+use iced::widget::{button, column, row, text, container, rule, scrollable};
 use iced::Length;
 
 use crate::data::DataFs;
-use crate::gui::{Message, TabId, Modal};
+use crate::data::models::Card;
+use crate::gui::{Message, TabId, Modal, DataSnapshot};
+use crate::gui::components::tree_view::TreeNode;
 use crate::timer::TimerManager;
 
 pub mod category_tab;
@@ -51,17 +55,18 @@ impl App {
             || {
                 let data_dir = DATA_DIR.get().cloned().unwrap_or_else(|| {
                     directories::ProjectDirs::from("com", "time-manager", "time-manager")
-                        .map(|p| p.data_dir().to_path_buf())
-                        .unwrap_or_else(|| PathBuf::from("./data"))
+                            .map(|p| p.data_dir().to_path_buf())
+                            .unwrap_or_else(|| PathBuf::from("./data"))
                 });
                 
                 let data_fs = DataFs::init(data_dir.clone()).expect("Failed to init data dir");
                 let timer_manager = TimerManager::new(data_dir.clone());
+                let data_fs_arc = Arc::new(data_fs);
                 
                 let state = App {
                     active_tab: TabId::Category,
                     data_dir: data_dir.clone(),
-                    data_fs,
+                    data_fs: (*data_fs_arc).clone(),
                     
                     category_tab: CategoryTabState::default(),
                     review_tab: ReviewTabState::default(),
@@ -76,7 +81,25 @@ impl App {
                     modal: None,
                 };
                 
-                (state, Task::none())
+                let load_task = Task::future(async move {
+                    let trees = data_fs_arc.list_trees().unwrap_or_default();
+                    let mut all_cards = Vec::new();
+                    for tree in &trees {
+                        let cards = data_fs_arc.list_cards(tree).unwrap_or_default();
+                        all_cards.extend(cards);
+                    }
+                    let presets = data_fs_arc.list_presets().unwrap_or_default();
+                    let todos = data_fs_arc.list_todos().unwrap_or_default();
+                    
+                    Message::DataLoaded(Ok(DataSnapshot {
+                        trees,
+                        cards: all_cards,
+                        presets,
+                        todos,
+                    }))
+                });
+                
+                (state, load_task)
             },
             App::update,
             App::view,
@@ -93,6 +116,28 @@ impl App {
         match message {
             Message::SwitchTab(tab_id) => {
                 self.active_tab = tab_id;
+                Task::none()
+            }
+            
+            Message::DataLoaded(result) => {
+                match result {
+                    Ok(snapshot) => {
+                        let tree_nodes = self.build_tree_nodes(&snapshot.trees, &snapshot.cards);
+                        self.category_tab.tree_nodes = tree_nodes;
+                        
+                        self.review_tab.cards = snapshot.cards.clone();
+                        self.preset_tab.presets = snapshot.presets.clone();
+                        self.todo_tab.todos = snapshot.todos.clone();
+                    }
+                    Err(e) => {
+                        self.error_message = Some(e.to_string());
+                    }
+                }
+                Task::none()
+            }
+            
+            Message::CardSelected(path) => {
+                self.category_tab.selected_path = Some(path.clone());
                 Task::none()
             }
             
@@ -118,6 +163,76 @@ impl App {
             
             _ => Task::none(),
         }
+    }
+    
+    fn build_tree_nodes(&self, trees: &[String], cards: &[(String, Card)]) -> Vec<TreeNode> {
+        let mut result: Vec<TreeNode> = Vec::new();
+        
+        for tree_name in trees {
+            let tree_cards: Vec<(String, &Card)> = cards
+                .iter()
+                .filter(|(path, _)| path.starts_with(&format!("{}/", tree_name)))
+                .map(|(path, card)| (path.clone(), card))
+                .collect();
+            
+            let mut tree_node = TreeNode {
+                name: tree_name.clone(),
+                path: tree_name.clone(),
+                is_card: false,
+                children: Vec::new(),
+            };
+            
+            for (card_path, _card) in tree_cards {
+                let relative_path = card_path.strip_prefix(&format!("{}/", tree_name)).unwrap_or(&card_path);
+                let parts: Vec<&str> = relative_path.split('/').collect();
+                
+                if parts.len() == 1 {
+                    tree_node.children.push(TreeNode {
+                        name: parts[0].to_string(),
+                        path: card_path.clone(),
+                        is_card: true,
+                        children: Vec::new(),
+                    });
+                } else {
+                    let folder_name = parts[0].to_string();
+                    let folder_path = format!("{}/{}", tree_name, folder_name);
+                    
+                    let folder = tree_node.children.iter_mut()
+                        .find(|n| n.path == folder_path);
+                    
+                    if let Some(folder) = folder {
+                        let card_name = parts.last().unwrap().to_string();
+                        folder.children.push(TreeNode {
+                            name: card_name,
+                            path: card_path.clone(),
+                            is_card: true,
+                            children: Vec::new(),
+                        });
+                    } else {
+                        let mut new_folder = TreeNode {
+                            name: folder_name.clone(),
+                            path: folder_path.clone(),
+                            is_card: false,
+                            children: Vec::new(),
+                        };
+                        
+                        let card_name = parts.last().unwrap().to_string();
+                        new_folder.children.push(TreeNode {
+                            name: card_name,
+                            path: card_path.clone(),
+                            is_card: true,
+                            children: Vec::new(),
+                        });
+                        
+                        tree_node.children.push(new_folder);
+                    }
+                }
+            }
+            
+            result.push(tree_node);
+        }
+        
+        result
     }
     
     fn view(&self) -> Element<Message> {
