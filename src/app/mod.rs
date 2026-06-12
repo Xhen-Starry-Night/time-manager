@@ -105,11 +105,23 @@ impl App {
             App::view,
         )
         .title(App::title)
+        .subscription(App::subscription)
         .run()
     }
     
     fn title(&self) -> String {
         String::from("Time Manager")
+    }
+    
+    fn subscription(&self) -> iced::Subscription<Message> {
+        use crate::timer::TimerState;
+        
+        if matches!(self.timer_tab.state, TimerState::Running { .. }) {
+            iced::time::every(std::time::Duration::from_secs(1))
+                .map(|_| Message::TimerTick(0))
+        } else {
+            iced::Subscription::none()
+        }
     }
     
     fn update(&mut self, message: Message) -> Task<Message> {
@@ -178,8 +190,8 @@ impl App {
                 Task::none()
             }
             
-            Message::TimerTick(elapsed) => {
-                self.timer_tab.elapsed_ms = elapsed;
+            Message::TimerTick(_) => {
+                self.timer_tab.elapsed_ms = self.timer_manager.get_state().elapsed_ms();
                 Task::none()
             }
             
