@@ -318,9 +318,11 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
                 time_manager::data::DataError::InvalidData(format!("Invalid UUID: {}", id))
             })?;
 
+            let todo = fs.get_todo(&uuid)?;
+
             let ics_content = format!(
-                "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART:{}\nDTEND:{}\nSUMMARY:Todo\nEND:VEVENT\nEND:VCALENDAR",
-                start, end
+                "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART:{}\nDTEND:{}\nSUMMARY:{}\nEND:VEVENT\nEND:VCALENDAR",
+                start, end, todo.content
             );
 
             let schedule_id = uuid::Uuid::new_v4();
