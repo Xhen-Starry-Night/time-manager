@@ -313,7 +313,7 @@ impl App {
                         .center_x(Length::Fill)
                         .center_y(Length::Fill)
                         .style(|_: &iced::Theme| iced::widget::container::Style {
-                            background: Some(iced::Color::from_rgb(0.92, 0.92, 0.92).into()),
+                            background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
                             ..Default::default()
                         })
                     };
