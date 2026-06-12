@@ -1,5 +1,5 @@
 use iced::widget::{column, row, text, container};
-use iced::{Element, Length, Color};
+use iced::{Element, Length};
 use crate::data::models::Card;
 
 pub struct CardDetail;
@@ -15,31 +15,31 @@ impl CardDetail {
             
             column![
                 row![
-                    text("下次复习:").width(Length::Fixed(100.0)).color(Color::from_rgb(0.2, 0.2, 0.2)),
-                    text(next_review).width(Length::Fill).color(Color::from_rgb(0.2, 0.2, 0.2)),
+                    text("下次复习:").width(Length::Fixed(100.0)),
+                    text(next_review).width(Length::Fill),
                 ],
                 row![
-                    text("算法:").width(Length::Fixed(100.0)).color(Color::from_rgb(0.2, 0.2, 0.2)),
-                    text(algorithm).width(Length::Fill).color(Color::from_rgb(0.2, 0.2, 0.2)),
+                    text("算法:").width(Length::Fixed(100.0)),
+                    text(algorithm).width(Length::Fill),
                 ],
                 row![
-                    text("预设:").width(Length::Fixed(100.0)).color(Color::from_rgb(0.2, 0.2, 0.2)),
-                    text(preset).width(Length::Fill).color(Color::from_rgb(0.2, 0.2, 0.2)),
+                    text("预设:").width(Length::Fixed(100.0)),
+                    text(preset).width(Length::Fill),
                 ],
             ]
         } else {
-            column![text("未预测").color(Color::from_rgb(0.4, 0.4, 0.4))]
+            column![text("未预测")]
         };
         
         let review_count = card.review_records.len();
         
         column![
-            text(path).size(18).color(Color::from_rgb(0.1, 0.1, 0.1)),
+            text(path).size(18),
             container(
                 column![
                     row![
-                        text("复习记录:").width(Length::Fixed(100.0)).color(Color::from_rgb(0.2, 0.2, 0.2)),
-                        text(format!("{} 次", review_count)).width(Length::Fill).color(Color::from_rgb(0.2, 0.2, 0.2)),
+                        text("复习记录:").width(Length::Fixed(100.0)),
+                        text(format!("{} 次", review_count)).width(Length::Fill),
                     ],
                     prediction_info,
                 ]
@@ -48,7 +48,7 @@ impl CardDetail {
             .padding(16)
             .width(Length::Fill)
             .style(|_: &iced::Theme| iced::widget::container::Style {
-                background: Some(iced::Color::from_rgb(0.95, 0.95, 0.95).into()),
+                background: Some(iced::Color::from_rgb(0.85, 0.85, 0.85).into()),
                 border: iced::Border {
                     radius: 4.0.into(),
                     ..Default::default()
