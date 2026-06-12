@@ -141,6 +141,7 @@ impl App {
                         self.review_tab.cards = snapshot.cards.clone();
                         self.preset_tab.presets = snapshot.presets.clone();
                         self.todo_tab.todos = snapshot.todos.clone();
+                        self.schedule_tab.schedules = self.data_fs.list_schedules().unwrap_or_default();
                     }
                     Err(e) => {
                         self.error_message = Some(e.to_string());
@@ -540,6 +541,189 @@ impl App {
                 .center_x(Length::Fill)
                 .center_y(Length::Fill)
                 .style(|_: &iced::Theme| iced::widget::container::Style {
+                    background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
+                    ..Default::default()
+                })
+                .into()
+            }
+            TabId::Schedule => {
+                let schedule_list = if self.schedule_tab.schedules.is_empty() {
+                    container(
+                        text("暂无日程安排")
+                            .size(16)
+                            .color(iced::Color::WHITE)
+                    )
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .center_x(Length::Fill)
+                    .center_y(Length::Fill)
+                } else {
+                    container(
+                        scrollable(
+                            column(
+                                self.schedule_tab.schedules.iter().map(|(id, _ics_content)| {
+                                    let id_str = id.to_string();
+                                    
+                                    row![
+                                        text(format!("日程 {}", id_str)).color(iced::Color::WHITE),
+                                    ]
+                                    .spacing(4)
+                                    .padding(8)
+                                    .width(Length::Fill)
+                                    .into()
+                                })
+                            )
+                            .spacing(8)
+                        )
+                    )
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                };
+                
+                container(
+                    column![
+                        row![
+                            container(text("日程").size(20).color(iced::Color::WHITE))
+                                .padding(8),
+                        ],
+                        rule::horizontal(1.0),
+                        schedule_list,
+                    ]
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                )
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .style(|_: &iced::Theme| iced::widget::container::Style {
+                    background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
+                    ..Default::default()
+                })
+                .into()
+            }
+            TabId::Preset => {
+                let preset_list: Vec<_> = self.preset_tab.presets.iter()
+                    .map(|preset| {
+                        row![
+                            text(preset.name.clone()).color(iced::Color::WHITE),
+                            text(if preset.fsrs_parameters.as_ref().map_or(true, |p| p.is_empty()) { "默认参数" } else { "已训练" })
+                                .color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                        ]
+                        .spacing(8)
+                        .padding(8)
+                        .width(Length::Fill)
+                        .into()
+                    })
+                    .collect();
+                
+                let content = if self.preset_tab.presets.is_empty() {
+                    container(text("暂无预设").color(iced::Color::from_rgb(0.6, 0.6, 0.6)))
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                        .center_x(Length::Fill)
+                        .center_y(Length::Fill)
+                } else {
+                    container(scrollable(column(preset_list).spacing(4)))
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                };
+                
+                container(
+                    column![
+                        row![text("预设").size(20).color(iced::Color::WHITE)].padding(8),
+                        rule::horizontal(1.0),
+                        content
+                    ]
+                )
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .style(|_: &iced::Theme| iced::widget::container::Style {
+                    background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
+                    ..Default::default()
+                })
+                .into()
+            }
+            TabId::Settings => {
+                container(
+                    column![
+                        text("设置").size(20).color(iced::Color::WHITE),
+                        rule::horizontal(1.0),
+                        row![
+                            text("数据目录:").color(iced::Color::WHITE),
+                            text(self.settings_tab.data_dir.to_string_lossy().to_string())
+                                .color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                        ]
+                        .spacing(8)
+                        .padding(16),
+                    ]
+                )
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .style(|_: &iced::Theme| iced::widget::container::Style {
+                    background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
+                    ..Default::default()
+                })
+                .into()
+            }
+            TabId::Preset => {
+                let preset_list: Vec<_> = self.preset_tab.presets.iter()
+                    .map(|preset| {
+                        row![
+                            text(preset.name.clone()).color(iced::Color::WHITE),
+                            text(preset.fsrs_parameters.as_ref().map_or("默认参数", |_| "已训练"))
+                                .color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                        ]
+                        .spacing(8)
+                        .padding(8)
+                        .into()
+                    })
+                    .collect();
+                
+                let content = if self.preset_tab.presets.is_empty() {
+                    container(text("暂无预设").color(iced::Color::from_rgb(0.6, 0.6, 0.6)))
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                        .center_x(Length::Fill)
+                        .center_y(Length::Fill)
+                } else {
+                    container(scrollable(column(preset_list).spacing(4)))
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                };
+                
+                container(
+                    column![
+                        row![text("预设").size(20).color(iced::Color::WHITE)].padding(8),
+                        rule::horizontal(1.0),
+                        content,
+                    ]
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                )
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .style(|_: &iced::Theme| iced::widget::container::Style {
+                    background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
+                    ..Default::default()
+                })
+                .into()
+            }
+            TabId::Settings => {
+                container(
+                    column![
+                        text("设置").size(20).color(iced::Color::WHITE),
+                        rule::horizontal(1.0),
+                        row![
+                            text("数据目录:").color(iced::Color::WHITE),
+                            text(self.settings_tab.data_dir.to_string_lossy().to_string())
+                                .color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                        ]
+                        .spacing(8)
+                        .padding(16),
+                    ]
+                )
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .style(|_| iced::widget::container::Style {
                     background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
                     ..Default::default()
                 })
