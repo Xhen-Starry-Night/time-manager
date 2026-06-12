@@ -58,11 +58,11 @@ impl TreeView {
         if node.is_card {
             btn.into()
         } else {
-            let is_expanded = self.expanded.get(&node.path).unwrap_or(&false);
+            let is_expanded = self.expanded.get(&node.path).copied().unwrap_or(true);
             
             column![
                 btn,
-                if *is_expanded && !node.children.is_empty() {
+                if is_expanded && !node.children.is_empty() {
                     column(node.children.iter().map(|c| self.view_node(c, selected, depth + 1)))
                         .spacing(1)
                 } else {
@@ -74,7 +74,16 @@ impl TreeView {
     }
     
     pub fn toggle(&mut self, path: &str) {
-        let current = self.expanded.get(path).unwrap_or(&false);
+        let current = self.expanded.get(path).copied().unwrap_or(true);
         self.expanded.insert(path.to_string(), !current);
+    }
+    
+    pub fn expand_all(&mut self, nodes: &[TreeNode]) {
+        for node in nodes {
+            if !node.is_card {
+                self.expanded.insert(node.path.clone(), true);
+                self.expand_all(&node.children);
+            }
+        }
     }
 }

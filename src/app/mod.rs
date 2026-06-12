@@ -123,7 +123,8 @@ impl App {
                 match result {
                     Ok(snapshot) => {
                         let tree_nodes = self.build_tree_nodes(&snapshot.trees, &snapshot.cards);
-                        self.category_tab.tree_nodes = tree_nodes;
+                        self.category_tab.tree_nodes = tree_nodes.clone();
+                        self.category_tab.tree_view.expand_all(&tree_nodes);
                         
                         self.review_tab.cards = snapshot.cards.clone();
                         self.preset_tab.presets = snapshot.presets.clone();
