@@ -172,6 +172,44 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
                 time_manager::data::DataError::InvalidData(format!("Invalid quality: {}", quality))
             })?;
 
+            let preset_name = card
+                .prediction
+                .as_ref()
+                .map(|p| p.preset_used.clone())
+                .unwrap_or_else(|| "default".to_string());
+
+            let preset = fs.get_preset(&preset_name).ok();
+            let predictor = if let Some(ref p) = preset {
+                if let Some(ref params) = p.fsrs_parameters {
+                    time_manager::fsrs::FsrsPredictor::with_parameters(params.clone())
+                        .map_err(time_manager::data::DataError::InvalidData)?
+                } else {
+                    time_manager::fsrs::FsrsPredictor::new()
+                        .map_err(time_manager::data::DataError::InvalidData)?
+                }
+            } else {
+                time_manager::fsrs::FsrsPredictor::new()
+                    .map_err(time_manager::data::DataError::InvalidData)?
+            };
+
+            let existing_state = card
+                .prediction
+                .as_ref()
+                .and_then(|p| time_manager::fsrs::FsrsPredictor::bytes_to_memory_state(&p.fsrs_state_bytes));
+
+            let days_since_last = if let Some(last_record) = card.review_records.last() {
+                (chrono::Utc::now() - last_record.timestamp).num_days() as u32
+            } else {
+                0
+            };
+
+            let (interval, memory_state) = predictor
+                .predict_next_review(existing_state, mq.clone(), days_since_last, 0.9)
+                .map_err(time_manager::data::DataError::InvalidData)?;
+
+            let state_bytes = time_manager::fsrs::FsrsPredictor::memory_state_to_bytes(&memory_state);
+            let next_review = chrono::Utc::now() + chrono::Duration::days(interval as i64);
+
             let record = ReviewRecord {
                 timestamp: chrono::Utc::now(),
                 duration_ms: timer_obj.duration_ms,
@@ -179,6 +217,13 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
             };
 
             card.review_records.push(record);
+            card.prediction = Some(time_manager::data::models::Prediction {
+                algorithm: "fsrs".to_string(),
+                next_review,
+                fsrs_state_bytes: state_bytes,
+                preset_used: preset_name,
+            });
+
             fs.save_card(&path, &card)?;
             println!("Linked timer to card: {}", path);
         }
@@ -361,32 +406,14 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
                 let cards = fs.list_cards(&tree)?;
                 for (card_path, card) in cards {
                     if let Some(prediction) = &card.prediction {
-                        let state = time_manager::fsrs::FsrsPredictor::bytes_to_memory_state(
-                            &prediction.fsrs_state_bytes,
-                        );
-                        if let Some(state) = state {
-                            let last_record = card.review_records.last();
-                            let predictor = time_manager::fsrs::FsrsPredictor::new()
-                                .map_err(time_manager::data::DataError::InvalidData)?;
-                            let (interval, _) = predictor
-                                .predict_next_review(
-                                    Some(state),
-                                    time_manager::data::models::MemoryQuality::Good,
-                                    0,
-                                    0.9,
-                                )
-                                .map_err(time_manager::data::DataError::InvalidData)?;
-
-                            let last_review = last_record.map(|r| r.timestamp).unwrap_or_else(chrono::Utc::now);
-                            let next_review =
-                                last_review + chrono::Duration::days(interval as i64);
+                        if !prediction.fsrs_state_bytes.is_empty() {
                             let urgency_level =
-                                time_manager::fsrs::FsrsPredictor::calculate_urgency(next_review);
+                                time_manager::fsrs::FsrsPredictor::calculate_urgency(prediction.next_review);
 
                             cards_with_urgency.push((
                                 card_path.clone(),
                                 urgency_level,
-                                next_review,
+                                prediction.next_review,
                             ));
                         }
                     }
