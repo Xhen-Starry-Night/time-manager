@@ -50,6 +50,12 @@ impl TimerState {
                 };
                 Ok(())
             }
+            Self::Stopped { .. } => {
+                *self = Self::Running {
+                    started_at: Utc::now(),
+                };
+                Ok(())
+            }
             _ => Err("Timer already running".to_string()),
         }
     }

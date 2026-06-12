@@ -104,7 +104,7 @@ pub enum Commands {
         start: String,
         #[arg(short, long)]
         end: String,
-        #[arg(short, long)]
+        #[arg(long)]
         summary: String,
     },
 
