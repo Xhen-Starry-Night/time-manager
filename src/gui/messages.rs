@@ -21,6 +21,7 @@ pub enum Message {
     CategorySelected(String),
     CardSelected(String),
     SearchChanged(String),
+    UrgencyFilterChanged(Option<u32>),
     
     ButtonPressed(ButtonId),
     InputChanged(String),

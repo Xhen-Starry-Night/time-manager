@@ -142,6 +142,16 @@ impl App {
                 Task::none()
             }
             
+            Message::SearchChanged(query) => {
+                self.review_tab.search_query = query;
+                Task::none()
+            }
+            
+            Message::UrgencyFilterChanged(filter) => {
+                self.review_tab.urgency_filter = filter;
+                Task::none()
+            }
+            
             Message::Error(msg) => {
                 self.error_message = Some(msg);
                 Task::none()
@@ -325,6 +335,80 @@ impl App {
                         .into()
                 }
             }
+            TabId::Review => {
+                use crate::fsrs::FsrsPredictor;
+                
+                let cards_with_urgency: Vec<(String, i32, &Card)> = self.review_tab.cards.iter()
+                    .filter_map(|(path, card)| {
+                        card.prediction.as_ref().map(|pred| {
+                            let urgency = FsrsPredictor::calculate_urgency(pred.next_review);
+                            (path.clone(), urgency, card)
+                        })
+                    })
+                    .filter(|(_, urgency, _)| {
+                        self.review_tab.urgency_filter
+                            .map_or(true, |filter| *urgency as u32 == filter)
+                    })
+                    .collect();
+                
+                let filter_buttons = row![
+                    filter_button("全部", None, self.review_tab.urgency_filter),
+                    filter_button("已过期", Some(3), self.review_tab.urgency_filter),
+                    filter_button("今日", Some(2), self.review_tab.urgency_filter),
+                    filter_button("近期", Some(1), self.review_tab.urgency_filter),
+                    filter_button("稍后", Some(0), self.review_tab.urgency_filter),
+                ]
+                .spacing(8)
+                .padding(8);
+                
+                let card_list = if cards_with_urgency.is_empty() {
+                    container(
+                        text("暂无需要复习的卡片")
+                            .size(16)
+                            .color(iced::Color::WHITE)
+                    )
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .center_x(Length::Fill)
+                    .center_y(Length::Fill)
+                } else {
+                    container(
+                        scrollable(
+                            column(
+                                cards_with_urgency.iter().map(|(path, urgency, _)| {
+                                    row![
+                                        container(
+                                            crate::gui::components::UrgencyBadge::view(*urgency as u32)
+                                                .map(|_| Message::ClearError)
+                                        ),
+                                        text(path.clone()).color(iced::Color::WHITE),
+                                    ]
+                                    .spacing(12)
+                                    .padding(8)
+                                    .width(Length::Fill)
+                                    .into()
+                                })
+                            )
+                            .spacing(4)
+                        )
+                    )
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                };
+                
+                container(
+                    column![filter_buttons, rule::horizontal(1.0), card_list]
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                )
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .style(|_: &iced::Theme| iced::widget::container::Style {
+                    background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
+                    ..Default::default()
+                })
+                .into()
+            }
             _ => {
                 container(
                     text(format!("{:?} Tab - Under Construction", self.active_tab))
@@ -348,7 +432,7 @@ impl App {
 fn tab_button(label: &str, tab_id: TabId, active_tab: TabId) -> Element<Message> {
     let is_active = tab_id == active_tab;
     
-    let btn = button(text(label))
+    let btn = button(text(label).color(iced::Color::WHITE))
         .on_press(Message::SwitchTab(tab_id));
     
     if is_active {
@@ -358,7 +442,33 @@ fn tab_button(label: &str, tab_id: TabId, active_tab: TabId) -> Element<Message>
             ..Default::default()
         })
     } else {
-        btn
+        btn.style(|_, _| iced::widget::button::Style {
+            background: Some(iced::Color::from_rgb(0.3, 0.3, 0.3).into()),
+            text_color: iced::Color::WHITE,
+            ..Default::default()
+        })
+    }
+    .into()
+}
+
+fn filter_button(label: &str, filter: Option<u32>, current: Option<u32>) -> Element<Message> {
+    let is_active = filter == current;
+    
+    let btn = button(text(label).color(iced::Color::WHITE))
+        .on_press(Message::UrgencyFilterChanged(filter));
+    
+    if is_active {
+        btn.style(|_, _| iced::widget::button::Style {
+            background: Some(iced::Color::from_rgb(0.2, 0.6, 0.86).into()),
+            text_color: iced::Color::WHITE,
+            ..Default::default()
+        })
+    } else {
+        btn.style(|_, _| iced::widget::button::Style {
+            background: Some(iced::Color::from_rgb(0.3, 0.3, 0.3).into()),
+            text_color: iced::Color::WHITE,
+            ..Default::default()
+        })
     }
     .into()
 }
