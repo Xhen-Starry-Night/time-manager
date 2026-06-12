@@ -36,7 +36,7 @@ impl TreeView {
         let is_selected = selected == Some(node.path.as_str());
         
         let content = row![
-            text(format!("{}{} {}", indent, icon, node.name)),
+            text(format!("{}{} {}", indent, icon, node.name)).color(iced::Color::from_rgb(0.2, 0.2, 0.2)),
         ]
         .spacing(4);
         

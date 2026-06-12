@@ -285,6 +285,10 @@ impl App {
                             .width(Length::FillPortion(3))
                             .height(Length::Fill)
                             .padding(16)
+                            .style(|_: &iced::Theme| iced::widget::container::Style {
+                                background: Some(iced::Color::from_rgb(0.92, 0.92, 0.92).into()),
+                                ..Default::default()
+                            })
                         } else {
                             container(
                                 text("选择卡片查看详情")
@@ -294,6 +298,10 @@ impl App {
                             .height(Length::Fill)
                             .center_x(Length::Fill)
                             .center_y(Length::Fill)
+                            .style(|_: &iced::Theme| iced::widget::container::Style {
+                                background: Some(iced::Color::from_rgb(0.92, 0.92, 0.92).into()),
+                                ..Default::default()
+                            })
                         }
                     } else {
                         container(
@@ -304,6 +312,10 @@ impl App {
                         .height(Length::Fill)
                         .center_x(Length::Fill)
                         .center_y(Length::Fill)
+                        .style(|_: &iced::Theme| iced::widget::container::Style {
+                            background: Some(iced::Color::from_rgb(0.92, 0.92, 0.92).into()),
+                            ..Default::default()
+                        })
                     };
                     
                     row![left_panel, right_panel]
