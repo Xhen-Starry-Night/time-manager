@@ -5,13 +5,31 @@ use crate::data::models::MemoryQuality;
 
 pub struct FsrsPredictor {
     engine: FSRS,
+    parameters: Vec<f32>,
 }
 
 impl FsrsPredictor {
     pub fn new() -> Result<Self, String> {
         let engine = FSRS::new(Some(&DEFAULT_PARAMETERS))
             .map_err(|e| format!("Failed to initialize FSRS: {:?}", e))?;
-        Ok(Self { engine })
+        Ok(Self {
+            engine,
+            parameters: DEFAULT_PARAMETERS.to_vec(),
+        })
+    }
+
+    pub fn with_parameters(parameters: Vec<f32>) -> Result<Self, String> {
+        let engine = FSRS::new(Some(&parameters))
+            .map_err(|e| format!("Failed to initialize FSRS: {:?}", e))?;
+        Ok(Self { engine, parameters })
+    }
+
+    pub fn get_parameters(&self) -> &[f32] {
+        &self.parameters
+    }
+
+    pub fn get_default_parameters() -> &'static [f32] {
+        &DEFAULT_PARAMETERS
     }
 
     pub fn predict_next_review(
@@ -49,10 +67,8 @@ impl FsrsPredictor {
     }
 
     pub fn memory_state_to_bytes(state: &MemoryState) -> Vec<u8> {
-        vec![
-            state.stability.to_le_bytes(),
-            state.difficulty.to_le_bytes(),
-        ]
+        [state.stability.to_le_bytes(),
+            state.difficulty.to_le_bytes()]
         .concat()
     }
 
@@ -96,6 +112,18 @@ mod tests {
 
         assert!(interval > 0);
         assert!(state.stability > 0.0);
+    }
+
+    #[test]
+    fn test_predictor_with_custom_parameters() {
+        let params = FsrsPredictor::get_default_parameters().to_vec();
+        let predictor = FsrsPredictor::with_parameters(params).unwrap();
+
+        let (interval, _) = predictor
+            .predict_next_review(None, MemoryQuality::Good, 0, 0.9)
+            .unwrap();
+
+        assert!(interval >= 0);
     }
 
     #[test]

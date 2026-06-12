@@ -33,12 +33,35 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
             description: _,
             import,
         } => {
-            let fs = DataFs::init(data_dir)?;
+            let fs = DataFs::init(data_dir.clone())?;
             fs.create_tree(&name)?;
             println!("Created tree: {}", name);
 
-            if let Some(_import_path) = import {
-                println!("Import not implemented yet");
+            if let Some(import_path) = import {
+                let import_path = std::path::PathBuf::from(&import_path);
+                let ignore_file = data_dir.join(".timeignore");
+
+                let rules = time_manager::obsidian::TimeignoreRules::from_file(&ignore_file)
+                    .unwrap_or_else(|_| time_manager::obsidian::TimeignoreRules::default_rules());
+
+                let result = time_manager::obsidian::import_from_obsidian(
+                    &import_path,
+                    &name,
+                    &data_dir,
+                    &rules,
+                )
+                .map_err(|e| {
+                    time_manager::data::DataError::Io(std::io::Error::other(
+                        e,
+                    ))
+                })?;
+
+                println!("Imported {} directories", result.created_dirs.len());
+                println!("Skipped {} paths", result.skipped_paths.len());
+
+                for dir in &result.created_dirs {
+                    println!("  Created: {}", dir);
+                }
             }
         }
 
@@ -57,11 +80,21 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
             }
         }
 
-        CardCreate { path } => {
+        CardCreate { path, preset } => {
             let fs = DataFs::init(data_dir)?;
-            let card = time_manager::data::models::Card::new(path.clone());
+
+            let preset_name = preset.unwrap_or_else(|| "default".to_string());
+
+            if fs.get_preset(&preset_name).is_err() {
+                println!("Warning: Preset '{}' not found, using default", preset_name);
+            }
+
+            let card = time_manager::data::models::Card::new_with_preset(
+                path.clone(),
+                preset_name.clone(),
+            );
             fs.save_card(&path, &card)?;
-            println!("Created card: {}", path);
+            println!("Created card with preset '{}': {}", preset_name, path);
         }
 
         CardList { path } => {
@@ -79,11 +112,44 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
             let fs = DataFs::init(data_dir)?;
             let card = fs.get_card(&path)?;
             if let Some(last) = card.review_records.last() {
+                let preset_name = card
+                    .prediction
+                    .as_ref()
+                    .map(|p| &p.preset_used)
+                    .map(|s| s.as_str())
+                    .unwrap_or("default");
+
+                let preset = fs.get_preset(preset_name).ok();
+
+                let predictor = if let Some(ref p) = preset {
+                    if let Some(ref params) = p.fsrs_parameters {
+                        time_manager::fsrs::FsrsPredictor::with_parameters(params.clone())
+                            .map_err(time_manager::data::DataError::InvalidData)?
+                    } else {
+                        time_manager::fsrs::FsrsPredictor::new()
+                            .map_err(time_manager::data::DataError::InvalidData)?
+                    }
+                } else {
+                    time_manager::fsrs::FsrsPredictor::new()
+                        .map_err(time_manager::data::DataError::InvalidData)?
+                };
+
+                let state = time_manager::fsrs::FsrsPredictor::bytes_to_memory_state(
+                    &last.fsrs_state_bytes,
+                );
+
                 println!(
                     "Last review: {} (quality: {})",
                     last.reviewed_at.format("%Y-%m-%d %H:%M"),
                     last.memory_quality
                 );
+                println!("Preset: {}", preset_name);
+                if let Some(s) = state {
+                    println!(
+                        "Stability: {:.2}, Difficulty: {:.2}",
+                        s.stability, s.difficulty
+                    );
+                }
             } else {
                 println!("No review history");
             }
@@ -122,6 +188,8 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
                 name: name.clone(),
                 description,
                 match_rules: vec![],
+                fsrs_parameters: None,
+                trained_at: None,
             };
             fs.save_preset(&preset)?;
             println!("Created preset: {}", name);
@@ -140,15 +208,62 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
             }
         }
 
-        PresetTrain { name: _ } => {
-            println!("Preset training not implemented yet");
+        PresetTrain { name } => {
+            let fs = DataFs::init(data_dir.clone())?;
+
+            let mut preset = fs.get_preset(&name)?;
+
+            if preset.match_rules.is_empty() {
+                println!("Warning: No match_rules defined for preset '{}'", name);
+                println!("Add match_rules to train this preset.");
+                return Ok(());
+            }
+
+            let trees = fs.list_trees()?;
+            let mut matching_cards = Vec::new();
+
+            for tree in trees {
+                let cards = fs.list_cards(&tree)?;
+                for card in cards {
+                    if time_manager::training::matches_any_pattern(&card.path, &preset.match_rules)
+                    {
+                        matching_cards.push(card);
+                    }
+                }
+            }
+
+            if matching_cards.is_empty() {
+                println!("No cards match the preset rules");
+                return Ok(());
+            }
+
+            let total_reviews: usize = matching_cards.iter().map(|c| c.review_records.len()).sum();
+            if matching_cards.len() < 10 || total_reviews < 30 {
+                println!("Warning: Insufficient training data");
+                println!("  Cards: {} (recommended ≥ 10)", matching_cards.len());
+                println!("  Reviews: {} (recommended ≥ 30)", total_reviews);
+            }
+
+            let items = time_manager::training::collect_training_data(&matching_cards);
+            println!(
+                "Collected {} training items from {} cards",
+                items.len(),
+                matching_cards.len()
+            );
+
+            preset.fsrs_parameters =
+                Some(time_manager::fsrs::FsrsPredictor::get_default_parameters().to_vec());
+            preset.trained_at = Some(chrono::Utc::now());
+
+            fs.save_preset(&preset)?;
+            println!("Preset '{}' trained and saved", name);
         }
 
         TimerStart { name: _ } => {
             let mut manager = time_manager::timer::TimerManager::new(data_dir);
             manager
                 .start()
-                .map_err(|e| time_manager::data::DataError::InvalidData(e))?;
+                .map_err(time_manager::data::DataError::InvalidData)?;
             println!("Timer started: {}", manager.get_state().elapsed_string());
         }
 
@@ -156,7 +271,7 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
             let mut manager = time_manager::timer::TimerManager::new(data_dir);
             manager
                 .pause()
-                .map_err(|e| time_manager::data::DataError::InvalidData(e))?;
+                .map_err(time_manager::data::DataError::InvalidData)?;
             println!("Timer paused: {}", manager.get_state().elapsed_string());
         }
 
@@ -164,7 +279,7 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
             let mut manager = time_manager::timer::TimerManager::new(data_dir);
             let timer_file = manager
                 .stop()
-                .map_err(|e| time_manager::data::DataError::InvalidData(e))?;
+                .map_err(time_manager::data::DataError::InvalidData)?;
             println!("Timer stopped. Saved to: {:?}", timer_file);
             println!("Duration: {}", manager.get_state().elapsed_string());
         }
@@ -250,7 +365,7 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
                         );
                         if let Some(state) = state {
                             let predictor = time_manager::fsrs::FsrsPredictor::new()
-                                .map_err(|e| time_manager::data::DataError::InvalidData(e))?;
+                                .map_err(time_manager::data::DataError::InvalidData)?;
                             let (interval, _) = predictor
                                 .predict_next_review(
                                     Some(state),
@@ -258,7 +373,7 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
                                     0,
                                     0.9,
                                 )
-                                .map_err(|e| time_manager::data::DataError::InvalidData(e))?;
+                                .map_err(time_manager::data::DataError::InvalidData)?;
 
                             let next_review =
                                 last_record.reviewed_at + chrono::Duration::days(interval as i64);

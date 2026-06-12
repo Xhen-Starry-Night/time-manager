@@ -113,6 +113,8 @@ fn test_save_and_retrieve_preset() {
         name: "custom".to_string(),
         description: Some("Custom preset".to_string()),
         match_rules: vec!["study/*".to_string()],
+        fsrs_parameters: None,
+        trained_at: None,
     };
 
     fs.save_preset(&preset).unwrap();
@@ -131,11 +133,15 @@ fn test_list_presets() {
         name: "p1".to_string(),
         description: None,
         match_rules: vec![],
+        fsrs_parameters: None,
+        trained_at: None,
     };
     let p2 = Preset {
         name: "p2".to_string(),
         description: None,
         match_rules: vec![],
+        fsrs_parameters: None,
+        trained_at: None,
     };
 
     fs.save_preset(&p1).unwrap();
@@ -266,4 +272,24 @@ fn test_deep_nested_card_path() {
             .join("categories/deep/level1/level2/level3/level4/card.json")
             .exists()
     );
+}
+
+#[test]
+fn test_card_with_prediction() {
+    let card = Card::new_with_preset("test/path".to_string(), "vocabulary".to_string());
+
+    assert!(card.prediction.is_some());
+    let pred = card.prediction.unwrap();
+    assert_eq!(pred.preset_used, "vocabulary");
+    assert_eq!(pred.algorithm, "fsrs");
+}
+
+#[test]
+fn test_preset_with_parameters() {
+    let mut preset = Preset::default_preset();
+    preset.fsrs_parameters = Some(vec![1.0, 2.0, 3.0]);
+    preset.match_rules = vec!["main/语言/**".to_string()];
+
+    assert!(preset.fsrs_parameters.is_some());
+    assert_eq!(preset.match_rules.len(), 1);
 }

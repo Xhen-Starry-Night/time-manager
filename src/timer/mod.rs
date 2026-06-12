@@ -1,4 +1,4 @@
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -19,6 +19,12 @@ pub enum TimerState {
         stopped_at: DateTime<Utc>,
         duration_ms: i64,
     },
+}
+
+impl Default for TimerState {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TimerState {
@@ -153,7 +159,7 @@ impl TimerManager {
             _ => return Err("Invalid state after stop".to_string()),
         };
 
-        Ok(self.save_timer_file(started_at, stopped_at, duration_ms)?)
+        self.save_timer_file(started_at, stopped_at, duration_ms)
     }
 
     pub fn get_state(&self) -> &TimerState {

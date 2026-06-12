@@ -32,7 +32,11 @@ pub enum Commands {
     },
 
     #[command(name = "card-create")]
-    CardCreate { path: String },
+    CardCreate {
+        path: String,
+        #[arg(short, long)]
+        preset: Option<String>,
+    },
 
     #[command(name = "card-list")]
     CardList { path: String },

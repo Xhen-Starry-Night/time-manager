@@ -18,6 +18,7 @@ uuid = { version = "1", features = ["v4", "serde"] }
 fsrs = "5"
 tracing = "0.1"
 clap = { version = "4", features = ["derive"] }
+globset = "0.4"
 
 [dev-dependencies]
 tempfile = "3"

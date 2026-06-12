@@ -1,5 +1,4 @@
 use chrono::Utc;
-use fsrs::DEFAULT_PARAMETERS;
 use tempfile::tempdir;
 use time_manager::data::{
     DataFs,
@@ -56,6 +55,8 @@ fn test_preset_workflow() {
         name: "intensive".to_string(),
         description: Some("高强度学习预设".to_string()),
         match_rules: vec!["study/*".to_string()],
+        fsrs_parameters: None,
+        trained_at: None,
     };
 
     fs.save_preset(&preset).unwrap();

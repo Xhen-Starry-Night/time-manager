@@ -3,9 +3,11 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Default)]
 pub enum MemoryQuality {
     Relearn,
     Hard,
+    #[default]
     Good,
     Easy,
 }
@@ -41,11 +43,6 @@ impl std::fmt::Display for MemoryQuality {
     }
 }
 
-impl Default for MemoryQuality {
-    fn default() -> Self {
-        Self::Good
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReviewRecord {
@@ -57,10 +54,30 @@ pub struct ReviewRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Prediction {
+    pub algorithm: String,
+    pub next_review: DateTime<Utc>,
+    pub fsrs_state_bytes: Vec<u8>,
+    pub preset_used: String,
+}
+
+impl Default for Prediction {
+    fn default() -> Self {
+        Self {
+            algorithm: "fsrs".to_string(),
+            next_review: Utc::now(),
+            fsrs_state_bytes: vec![],
+            preset_used: "default".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Card {
     pub path: String,
     pub source: Option<String>,
     pub review_records: Vec<ReviewRecord>,
+    pub prediction: Option<Prediction>,
 }
 
 impl Card {
@@ -69,6 +86,19 @@ impl Card {
             path,
             source: None,
             review_records: Vec::new(),
+            prediction: None,
+        }
+    }
+
+    pub fn new_with_preset(path: String, preset: String) -> Self {
+        Self {
+            path,
+            source: None,
+            review_records: Vec::new(),
+            prediction: Some(Prediction {
+                preset_used: preset,
+                ..Default::default()
+            }),
         }
     }
 }
@@ -107,6 +137,8 @@ pub struct Preset {
     pub name: String,
     pub description: Option<String>,
     pub match_rules: Vec<String>,
+    pub fsrs_parameters: Option<Vec<f32>>,
+    pub trained_at: Option<DateTime<Utc>>,
 }
 
 impl Preset {
@@ -115,6 +147,8 @@ impl Preset {
             name: "default".into(),
             description: Some("默认预设".into()),
             match_rules: Vec::new(),
+            fsrs_parameters: None,
+            trained_at: None,
         }
     }
 }
