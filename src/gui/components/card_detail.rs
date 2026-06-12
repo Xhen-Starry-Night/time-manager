@@ -35,26 +35,15 @@ impl CardDetail {
         
         column![
             text(path).size(18),
-            container(
-                column![
-                    row![
-                        text("复习记录:").width(Length::Fixed(100.0)),
-                        text(format!("{} 次", review_count)).width(Length::Fill),
-                    ],
-                    prediction_info,
-                ]
-                .spacing(8)
-            )
-            .padding(16)
-            .width(Length::Fill)
-            .style(|_: &iced::Theme| iced::widget::container::Style {
-                background: Some(iced::Color::from_rgb(0.85, 0.85, 0.85).into()),
-                border: iced::Border {
-                    radius: 4.0.into(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            }),
+            column![
+                row![
+                    text("复习记录:").width(Length::Fixed(100.0)),
+                    text(format!("{} 次", review_count)).width(Length::Fill),
+                ],
+                prediction_info,
+            ]
+            .spacing(8)
+            .padding(16),
         ]
         .spacing(16)
         .into()
