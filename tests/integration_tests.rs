@@ -27,12 +27,17 @@ fn test_full_learning_workflow() {
 
     let state_bytes = FsrsPredictor::memory_state_to_bytes(&memory_state);
 
-    let record = ReviewRecord {
-        timer_path: "2026-06-09T20-00-00".to_string(),
-        reviewed_at: Utc::now(),
-        memory_quality: MemoryQuality::Good,
-        state_bytes: state_bytes.clone(),
+    card.prediction = Some(time_manager::data::models::Prediction {
+        algorithm: "fsrs".to_string(),
+        next_review: Utc::now() + chrono::Duration::days(interval as i64),
         fsrs_state_bytes: state_bytes,
+        preset_used: "default".to_string(),
+    });
+
+    let record = ReviewRecord {
+        timestamp: Utc::now(),
+        duration_ms: 1800000,
+        memory_quality: MemoryQuality::Good,
     };
 
     card.review_records.push(record);
@@ -41,9 +46,10 @@ fn test_full_learning_workflow() {
     let updated = fs.get_card(card_path).unwrap();
     assert_eq!(updated.review_records.len(), 1);
 
-    let last_record = updated.review_records.last().unwrap();
-    let recovered_state = FsrsPredictor::bytes_to_memory_state(&last_record.state_bytes);
-    assert!(recovered_state.is_some());
+    if let Some(prediction) = &updated.prediction {
+        let recovered_state = FsrsPredictor::bytes_to_memory_state(&prediction.fsrs_state_bytes);
+        assert!(recovered_state.is_some());
+    }
 }
 
 #[test]

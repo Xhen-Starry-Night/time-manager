@@ -79,14 +79,16 @@ fn test_save_and_retrieve_timer() {
     let dir = tempdir().unwrap();
     let fs = DataFs::init(dir.path().to_path_buf()).unwrap();
 
-    let timer = Timer::new(Utc::now());
+    let started = Utc::now();
+    let stopped = started + chrono::Duration::seconds(90);
+    let timer = Timer::new(started, stopped, 90000);
     let filename = timer.filename();
 
     fs.save_timer(&timer).unwrap();
     let retrieved = fs.get_timer(&filename).unwrap();
 
     assert_eq!(retrieved.started_at, timer.started_at);
-    assert_eq!(retrieved.duration_ms, 0);
+    assert_eq!(retrieved.duration_ms, 90000);
 }
 
 #[test]
@@ -94,8 +96,9 @@ fn test_list_timers() {
     let dir = tempdir().unwrap();
     let fs = DataFs::init(dir.path().to_path_buf()).unwrap();
 
-    let timer1 = Timer::new(Utc::now());
-    let timer2 = Timer::new(Utc::now() + chrono::Duration::hours(1));
+    let now = Utc::now();
+    let timer1 = Timer::new(now, now + chrono::Duration::seconds(60), 60000);
+    let timer2 = Timer::new(now + chrono::Duration::hours(1), now + chrono::Duration::hours(2), 3600000);
 
     fs.save_timer(&timer1).unwrap();
     fs.save_timer(&timer2).unwrap();
@@ -211,12 +214,16 @@ fn test_card_with_review_records() {
     let state_bytes = FsrsPredictor::memory_state_to_bytes(&state);
 
     let mut card = Card::new("test/card".to_string());
-    card.review_records.push(ReviewRecord {
-        timer_path: "timer1".to_string(),
-        reviewed_at: Utc::now(),
-        memory_quality: MemoryQuality::Good,
-        state_bytes: state_bytes.clone(),
+    card.prediction = Some(time_manager::data::models::Prediction {
+        algorithm: "fsrs".to_string(),
+        next_review: Utc::now() + chrono::Duration::days(7),
         fsrs_state_bytes: state_bytes,
+        preset_used: "default".to_string(),
+    });
+    card.review_records.push(ReviewRecord {
+        timestamp: Utc::now(),
+        duration_ms: 1800000,
+        memory_quality: MemoryQuality::Good,
     });
 
     fs.save_card("test/card", &card).unwrap();

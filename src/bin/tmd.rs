@@ -112,11 +112,17 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
             let fs = DataFs::init(data_dir)?;
             let card = fs.get_card(&path)?;
             if let Some(last) = card.review_records.last() {
+                println!(
+                    "Last review: {} (quality: {}, duration: {}ms)",
+                    last.timestamp.format("%Y-%m-%d %H:%M"),
+                    last.memory_quality,
+                    last.duration_ms
+                );
+
                 let preset_name = card
                     .prediction
                     .as_ref()
-                    .map(|p| &p.preset_used)
-                    .map(|s| s.as_str())
+                    .map(|p| p.preset_used.as_str())
                     .unwrap_or("default");
 
                 let preset = fs.get_preset(preset_name).ok();
@@ -134,15 +140,15 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
                         .map_err(time_manager::data::DataError::InvalidData)?
                 };
 
-                let state = time_manager::fsrs::FsrsPredictor::bytes_to_memory_state(
-                    &last.fsrs_state_bytes,
-                );
+                let state = card
+                    .prediction
+                    .as_ref()
+                    .and_then(|p| {
+                        time_manager::fsrs::FsrsPredictor::bytes_to_memory_state(
+                            &p.fsrs_state_bytes,
+                        )
+                    });
 
-                println!(
-                    "Last review: {} (quality: {})",
-                    last.reviewed_at.format("%Y-%m-%d %H:%M"),
-                    last.memory_quality
-                );
                 println!("Preset: {}", preset_name);
                 if let Some(s) = state {
                     println!(
@@ -162,7 +168,7 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
         } => {
             let fs = DataFs::init(data_dir)?;
             let mut card = fs.get_card(&path)?;
-            let _timer_obj = fs.get_timer(&timer)?;
+            let timer_obj = fs.get_timer(&timer)?;
 
             use time_manager::data::models::{MemoryQuality, ReviewRecord};
             let mq = MemoryQuality::from_str(&quality).ok_or_else(|| {
@@ -170,11 +176,9 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
             })?;
 
             let record = ReviewRecord {
-                timer_path: timer,
-                reviewed_at: chrono::Utc::now(),
+                timestamp: chrono::Utc::now(),
+                duration_ms: timer_obj.duration_ms,
                 memory_quality: mq,
-                state_bytes: vec![],
-                fsrs_state_bytes: vec![],
             };
 
             card.review_records.push(record);
@@ -288,9 +292,7 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
             let fs = DataFs::init(data_dir)?;
             let timer = fs.get_timer(&name)?;
             println!("Started: {}", timer.started_at);
-            if let Some(stopped) = timer.stopped_at {
-                println!("Stopped: {}", stopped);
-            }
+            println!("Stopped: {}", timer.stopped_at);
             println!("Duration: {}ms", timer.duration_ms);
         }
 
@@ -359,11 +361,12 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
             for tree in trees {
                 let cards = fs.list_cards(&tree)?;
                 for card in cards {
-                    if let Some(last_record) = card.review_records.last() {
+                    if let Some(prediction) = &card.prediction {
                         let state = time_manager::fsrs::FsrsPredictor::bytes_to_memory_state(
-                            &last_record.fsrs_state_bytes,
+                            &prediction.fsrs_state_bytes,
                         );
                         if let Some(state) = state {
+                            let last_record = card.review_records.last();
                             let predictor = time_manager::fsrs::FsrsPredictor::new()
                                 .map_err(time_manager::data::DataError::InvalidData)?;
                             let (interval, _) = predictor
@@ -375,8 +378,9 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
                                 )
                                 .map_err(time_manager::data::DataError::InvalidData)?;
 
+                            let last_review = last_record.map(|r| r.timestamp).unwrap_or_else(chrono::Utc::now);
                             let next_review =
-                                last_record.reviewed_at + chrono::Duration::days(interval as i64);
+                                last_review + chrono::Duration::days(interval as i64);
                             let urgency_level =
                                 time_manager::fsrs::FsrsPredictor::calculate_urgency(next_review);
 

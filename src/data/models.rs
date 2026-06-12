@@ -46,11 +46,9 @@ impl std::fmt::Display for MemoryQuality {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReviewRecord {
-    pub timer_path: String,
-    pub reviewed_at: DateTime<Utc>,
+    pub timestamp: DateTime<Utc>,
+    pub duration_ms: i64,
     pub memory_quality: MemoryQuality,
-    pub state_bytes: Vec<u8>,
-    pub fsrs_state_bytes: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -106,30 +104,22 @@ impl Card {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Timer {
     pub started_at: DateTime<Utc>,
-    pub stopped_at: Option<DateTime<Utc>>,
+    pub stopped_at: DateTime<Utc>,
     pub duration_ms: i64,
-    pub pause_records: Vec<PauseRecord>,
 }
 
 impl Timer {
-    pub fn new(started_at: DateTime<Utc>) -> Self {
+    pub fn new(started_at: DateTime<Utc>, stopped_at: DateTime<Utc>, duration_ms: i64) -> Self {
         Self {
             started_at,
-            stopped_at: None,
-            duration_ms: 0,
-            pause_records: Vec::new(),
+            stopped_at,
+            duration_ms,
         }
     }
 
     pub fn filename(&self) -> String {
         self.started_at.format("%Y-%m-%dT%H-%M-%S").to_string()
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct PauseRecord {
-    pub pause_start: DateTime<Utc>,
-    pub resume_time: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

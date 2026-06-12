@@ -31,8 +31,8 @@ pub fn convert_card_to_fsrs_items(card: &Card) -> Option<Vec<FSRSItem>> {
         let delta_t = if i == 0 {
             0
         } else {
-            let prev_time = card.review_records[i - 1].reviewed_at;
-            let curr_time = record.reviewed_at;
+            let prev_time = card.review_records[i - 1].timestamp;
+            let curr_time = record.timestamp;
             (curr_time - prev_time).num_days() as u32
         };
 
@@ -85,18 +85,14 @@ mod tests {
     fn test_convert_card_to_fsrs_items() {
         let mut card = Card::new("test".to_string());
         card.review_records.push(ReviewRecord {
-            timer_path: "t1".to_string(),
-            reviewed_at: Utc::now() - Duration::days(3),
+            timestamp: Utc::now() - Duration::days(3),
+            duration_ms: 1800000,
             memory_quality: MemoryQuality::Good,
-            state_bytes: vec![],
-            fsrs_state_bytes: vec![],
         });
         card.review_records.push(ReviewRecord {
-            timer_path: "t2".to_string(),
-            reviewed_at: Utc::now(),
+            timestamp: Utc::now(),
+            duration_ms: 1200000,
             memory_quality: MemoryQuality::Easy,
-            state_bytes: vec![],
-            fsrs_state_bytes: vec![],
         });
 
         let items = convert_card_to_fsrs_items(&card).unwrap();
