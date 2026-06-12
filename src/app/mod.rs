@@ -152,6 +152,37 @@ impl App {
                 Task::none()
             }
             
+            Message::TimerStarted => {
+                self.timer_manager.start();
+                self.timer_tab.state = self.timer_manager.get_state().clone();
+                Task::none()
+            }
+            
+            Message::TimerPaused => {
+                self.timer_manager.pause();
+                self.timer_tab.state = self.timer_manager.get_state().clone();
+                Task::none()
+            }
+            
+            Message::TimerStopped(result) => {
+                match result {
+                    Ok(_path) => {
+                        self.timer_manager.stop();
+                        self.timer_tab.state = self.timer_manager.get_state().clone();
+                        self.timer_tab.elapsed_ms = 0;
+                    }
+                    Err(e) => {
+                        self.error_message = Some(e);
+                    }
+                }
+                Task::none()
+            }
+            
+            Message::TimerTick(elapsed) => {
+                self.timer_tab.elapsed_ms = elapsed;
+                Task::none()
+            }
+            
             Message::Error(msg) => {
                 self.error_message = Some(msg);
                 Task::none()
@@ -403,6 +434,99 @@ impl App {
                 )
                 .width(Length::Fill)
                 .height(Length::Fill)
+                .style(|_: &iced::Theme| iced::widget::container::Style {
+                    background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
+                    ..Default::default()
+                })
+                .into()
+            }
+            TabId::Timer => {
+                use crate::timer::TimerState;
+                use crate::gui::components::TimerDisplay;
+                
+                let timer_display = TimerDisplay::view(&self.timer_tab.state, self.timer_tab.elapsed_ms)
+                    .map(|_| Message::ClearError);
+                
+                let (start_btn, pause_btn, stop_btn) = match &self.timer_tab.state {
+                    TimerState::Idle => {
+                        (
+                            button(text("开始").color(iced::Color::WHITE))
+                                .on_press(Message::TimerStarted)
+                                .style(|_, _| iced::widget::button::Style {
+                                    background: Some(iced::Color::from_rgb(0.2, 0.7, 0.4).into()),
+                                    text_color: iced::Color::WHITE,
+                                    ..Default::default()
+                                }),
+                            button(text("暂停").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
+                            button(text("停止").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
+                        )
+                    }
+                    TimerState::Running { .. } => {
+                        (
+                            button(text("开始").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
+                            button(text("暂停").color(iced::Color::WHITE))
+                                .on_press(Message::TimerPaused)
+                                .style(|_, _| iced::widget::button::Style {
+                                    background: Some(iced::Color::from_rgb(0.95, 0.61, 0.07).into()),
+                                    text_color: iced::Color::WHITE,
+                                    ..Default::default()
+                                }),
+                            button(text("停止").color(iced::Color::WHITE))
+                                .on_press(Message::TimerStopped(Ok(std::path::PathBuf::new())))
+                                .style(|_, _| iced::widget::button::Style {
+                                    background: Some(iced::Color::from_rgb(0.91, 0.30, 0.24).into()),
+                                    text_color: iced::Color::WHITE,
+                                    ..Default::default()
+                                }),
+                        )
+                    }
+                    TimerState::Paused { .. } => {
+                        (
+                            button(text("开始").color(iced::Color::WHITE))
+                                .on_press(Message::TimerStarted)
+                                .style(|_, _| iced::widget::button::Style {
+                                    background: Some(iced::Color::from_rgb(0.2, 0.7, 0.4).into()),
+                                    text_color: iced::Color::WHITE,
+                                    ..Default::default()
+                                }),
+                            button(text("暂停").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
+                            button(text("停止").color(iced::Color::WHITE))
+                                .on_press(Message::TimerStopped(Ok(std::path::PathBuf::new())))
+                                .style(|_, _| iced::widget::button::Style {
+                                    background: Some(iced::Color::from_rgb(0.91, 0.30, 0.24).into()),
+                                    text_color: iced::Color::WHITE,
+                                    ..Default::default()
+                                }),
+                        )
+                    }
+                    TimerState::Stopped { .. } => {
+                        (
+                            button(text("开始").color(iced::Color::WHITE))
+                                .on_press(Message::TimerStarted)
+                                .style(|_, _| iced::widget::button::Style {
+                                    background: Some(iced::Color::from_rgb(0.2, 0.7, 0.4).into()),
+                                    text_color: iced::Color::WHITE,
+                                    ..Default::default()
+                                }),
+                            button(text("暂停").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
+                            button(text("停止").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
+                        )
+                    }
+                };
+                
+                let controls = row![start_btn, pause_btn, stop_btn]
+                    .spacing(16)
+                    .padding(16);
+                
+                container(
+                    column![timer_display, controls]
+                        .spacing(32)
+                        .align_x(iced::Alignment::Center)
+                )
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .center_x(Length::Fill)
+                .center_y(Length::Fill)
                 .style(|_: &iced::Theme| iced::widget::container::Style {
                     background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
                     ..Default::default()
