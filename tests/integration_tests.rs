@@ -14,11 +14,10 @@ fn test_full_learning_workflow() {
     fs.create_tree("study").unwrap();
 
     let card_path = "study/languages/english";
-    let mut card = Card::new(card_path.to_string());
+    let mut card = Card::new();
     fs.save_card(card_path, &card).unwrap();
 
     let loaded = fs.get_card(card_path).unwrap();
-    assert_eq!(loaded.path, card_path);
 
     let predictor = FsrsPredictor::new().unwrap();
     let (interval, memory_state) = predictor
@@ -131,15 +130,15 @@ fn test_multiple_cards_in_tree() {
     ];
 
     for path in &paths {
-        let card = Card::new(path.to_string());
+        let card = Card::new();
         fs.save_card(path, &card).unwrap();
     }
 
     let cards = fs.list_cards("project").unwrap();
     assert_eq!(cards.len(), 3);
 
-    for card in &cards {
-        assert!(paths.contains(&card.path.as_str()));
+    for (card_path, _) in &cards {
+        assert!(paths.contains(&card_path.as_str()));
     }
 }
 

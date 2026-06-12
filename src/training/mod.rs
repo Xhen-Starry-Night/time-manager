@@ -83,7 +83,7 @@ mod tests {
 
     #[test]
     fn test_convert_card_to_fsrs_items() {
-        let mut card = Card::new("test".to_string());
+        let mut card = Card::new();
         card.review_records.push(ReviewRecord {
             timestamp: Utc::now() - Duration::days(3),
             duration_ms: 1800000,

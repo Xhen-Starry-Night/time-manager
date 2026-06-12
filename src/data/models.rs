@@ -72,26 +72,20 @@ impl Default for Prediction {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Card {
-    pub path: String,
-    pub source: Option<String>,
     pub review_records: Vec<ReviewRecord>,
     pub prediction: Option<Prediction>,
 }
 
 impl Card {
-    pub fn new(path: String) -> Self {
+    pub fn new() -> Self {
         Self {
-            path,
-            source: None,
             review_records: Vec::new(),
             prediction: None,
         }
     }
 
-    pub fn new_with_preset(path: String, preset: String) -> Self {
+    pub fn new_with_preset(preset: String) -> Self {
         Self {
-            path,
-            source: None,
             review_records: Vec::new(),
             prediction: Some(Prediction {
                 preset_used: preset,

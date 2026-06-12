@@ -69,8 +69,8 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
             let fs = DataFs::init(data_dir)?;
             if let Some(tree_name) = name {
                 let cards = fs.list_cards(&tree_name)?;
-                for card in cards {
-                    println!("{}", card.path);
+                for (card_path, _) in cards {
+                    println!("{}", card_path);
                 }
             } else {
                 let trees = fs.list_trees()?;
@@ -89,10 +89,7 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
                 println!("Warning: Preset '{}' not found, using default", preset_name);
             }
 
-            let card = time_manager::data::models::Card::new_with_preset(
-                path.clone(),
-                preset_name.clone(),
-            );
+            let card = time_manager::data::models::Card::new_with_preset(preset_name.clone());
             fs.save_card(&path, &card)?;
             println!("Created card with preset '{}': {}", preset_name, path);
         }
@@ -101,9 +98,9 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
             let fs = DataFs::init(data_dir)?;
             let tree = path.split('/').next().unwrap_or("");
             let cards = fs.list_cards(tree)?;
-            for card in cards {
-                if card.path.starts_with(&path) {
-                    println!("{}", card.path);
+            for (card_path, _) in cards {
+                if card_path.starts_with(&path) {
+                    println!("{}", card_path);
                 }
             }
         }
@@ -228,8 +225,8 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
 
             for tree in trees {
                 let cards = fs.list_cards(&tree)?;
-                for card in cards {
-                    if time_manager::training::matches_any_pattern(&card.path, &preset.match_rules)
+                for (card_path, card) in cards {
+                    if time_manager::training::matches_any_pattern(&card_path, &preset.match_rules)
                     {
                         matching_cards.push(card);
                     }
@@ -362,7 +359,7 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
 
             for tree in trees {
                 let cards = fs.list_cards(&tree)?;
-                for card in cards {
+                for (card_path, card) in cards {
                     if let Some(prediction) = &card.prediction {
                         let state = time_manager::fsrs::FsrsPredictor::bytes_to_memory_state(
                             &prediction.fsrs_state_bytes,
@@ -387,7 +384,7 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
                                 time_manager::fsrs::FsrsPredictor::calculate_urgency(next_review);
 
                             cards_with_urgency.push((
-                                card.path.clone(),
+                                card_path.clone(),
                                 urgency_level,
                                 next_review,
                             ));

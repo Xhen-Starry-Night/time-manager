@@ -97,13 +97,13 @@ impl DataFs {
         Ok(card)
     }
 
-    pub fn list_cards(&self, tree: &str) -> Result<Vec<Card>> {
+    pub fn list_cards(&self, tree: &str) -> Result<Vec<(String, Card)>> {
         let tree_dir = self.data_dir.join("categories").join(tree);
         if !tree_dir.exists() {
             return Ok(Vec::new());
         }
 
-        let cards: Vec<Card> = WalkDir::new(&tree_dir)
+        let cards: Vec<(String, Card)> = WalkDir::new(&tree_dir)
             .into_iter()
             .filter_map(|e| e.ok())
             .filter(|e| {
@@ -113,8 +113,17 @@ impl DataFs {
                     .unwrap_or(false)
             })
             .filter_map(|e| {
-                let json = std::fs::read_to_string(e.path()).ok()?;
-                serde_json::from_str::<Card>(&json).ok()
+                let path = e.path();
+                let card_path = path
+                    .strip_prefix(&self.data_dir.join("categories"))
+                    .ok()?;
+                let card_path_str = card_path
+                    .to_string_lossy()
+                    .replace(".json", "");
+                
+                let json = std::fs::read_to_string(path).ok()?;
+                let card: Card = serde_json::from_str(&json).ok()?;
+                Some((card_path_str, card))
             })
             .collect();
 

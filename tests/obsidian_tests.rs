@@ -15,7 +15,7 @@ fn test_full_workflow() {
     preset.match_rules = vec!["test/**".to_string()];
     fs.save_preset(&preset).unwrap();
 
-    let card = Card::new_with_preset("test/card".to_string(), "test".to_string());
+    let card = Card::new_with_preset("test".to_string());
     fs.save_card("test/card", &card).unwrap();
 
     let loaded = fs.get_preset("test").unwrap();
@@ -112,7 +112,7 @@ fn test_collect_empty_training_data() {
 
 #[test]
 fn test_card_without_reviews() {
-    let card = Card::new("test/path".to_string());
+    let card = Card::new();
     let items = time_manager::training::convert_card_to_fsrs_items(&card);
     assert!(items.is_none());
 }
@@ -122,7 +122,7 @@ fn test_card_create_with_nonexistent_preset() {
     let dir = tempdir().unwrap();
     let fs = DataFs::init(dir.path().to_path_buf()).unwrap();
 
-    let card = Card::new_with_preset("test/card".to_string(), "nonexistent".to_string());
+    let card = Card::new_with_preset("nonexistent".to_string());
     fs.save_card("test/card", &card).unwrap();
 
     let loaded = fs.get_card("test/card").unwrap();

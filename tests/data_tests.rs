@@ -40,11 +40,10 @@ fn test_save_and_retrieve_card() {
     let fs = DataFs::init(dir.path().to_path_buf()).unwrap();
     fs.create_tree("main").unwrap();
 
-    let card = Card::new("main/path/to/card".to_string());
+    let card = Card::new();
     fs.save_card("main/path/to/card", &card).unwrap();
 
     let retrieved = fs.get_card("main/path/to/card").unwrap();
-    assert_eq!(retrieved.path, "main/path/to/card");
     assert_eq!(retrieved.review_records.len(), 0);
 }
 
@@ -63,11 +62,11 @@ fn test_list_cards_in_tree() {
     let fs = DataFs::init(dir.path().to_path_buf()).unwrap();
     fs.create_tree("study").unwrap();
 
-    fs.save_card("study/card1", &Card::new("study/card1".to_string()))
+    fs.save_card("study/card1", &Card::new())
         .unwrap();
-    fs.save_card("study/card2", &Card::new("study/card2".to_string()))
+    fs.save_card("study/card2", &Card::new())
         .unwrap();
-    fs.save_card("study/sub/card3", &Card::new("study/sub/card3".to_string()))
+    fs.save_card("study/sub/card3", &Card::new())
         .unwrap();
 
     let cards = fs.list_cards("study").unwrap();
@@ -213,7 +212,7 @@ fn test_card_with_review_records() {
         .unwrap();
     let state_bytes = FsrsPredictor::memory_state_to_bytes(&state);
 
-    let mut card = Card::new("test/card".to_string());
+    let mut card = Card::new();
     card.prediction = Some(time_manager::data::models::Prediction {
         algorithm: "fsrs".to_string(),
         next_review: Utc::now() + chrono::Duration::days(7),
@@ -239,9 +238,9 @@ fn test_multiple_operations_sequence() {
 
     fs.create_tree("project").unwrap();
 
-    fs.save_card("project/a", &Card::new("project/a".to_string()))
+    fs.save_card("project/a", &Card::new())
         .unwrap();
-    fs.save_card("project/b", &Card::new("project/b".to_string()))
+    fs.save_card("project/b", &Card::new())
         .unwrap();
 
     let todo1 = Todo::new("Task 1".to_string());
@@ -267,12 +266,11 @@ fn test_deep_nested_card_path() {
     fs.create_tree("deep").unwrap();
 
     let deep_path = "deep/level1/level2/level3/level4/card";
-    let card = Card::new(deep_path.to_string());
+    let card = Card::new();
 
     fs.save_card(deep_path, &card).unwrap();
 
     let retrieved = fs.get_card(deep_path).unwrap();
-    assert_eq!(retrieved.path, deep_path);
 
     assert!(
         dir.path()
@@ -283,7 +281,7 @@ fn test_deep_nested_card_path() {
 
 #[test]
 fn test_card_with_prediction() {
-    let card = Card::new_with_preset("test/path".to_string(), "vocabulary".to_string());
+    let card = Card::new_with_preset("vocabulary".to_string());
 
     assert!(card.prediction.is_some());
     let pred = card.prediction.unwrap();
