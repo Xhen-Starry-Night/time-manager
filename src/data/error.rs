@@ -1,12 +1,12 @@
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum DataError {
     #[error("io error: {0}")]
-    Io(#[from] std::io::Error),
+    Io(String),
 
     #[error("json error: {0}")]
-    Json(#[from] serde_json::Error),
+    Json(String),
 
     #[error("invalid path: {0}")]
     InvalidPath(String),
@@ -28,6 +28,18 @@ pub enum DataError {
 
     #[error("invalid data: {0}")]
     InvalidData(String),
+}
+
+impl From<std::io::Error> for DataError {
+    fn from(e: std::io::Error) -> Self {
+        DataError::Io(e.to_string())
+    }
+}
+
+impl From<serde_json::Error> for DataError {
+    fn from(e: serde_json::Error) -> Self {
+        DataError::Json(e.to_string())
+    }
 }
 
 pub type Result<T> = std::result::Result<T, DataError>;

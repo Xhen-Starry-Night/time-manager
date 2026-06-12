@@ -10,19 +10,19 @@ pub struct DataFs {
 
 impl DataFs {
     pub fn init(data_dir: PathBuf) -> Result<Self> {
-        std::fs::create_dir_all(&data_dir).map_err(DataError::Io)?;
-        std::fs::create_dir_all(data_dir.join("categories")).map_err(DataError::Io)?;
-        std::fs::create_dir_all(data_dir.join("timers")).map_err(DataError::Io)?;
-        std::fs::create_dir_all(data_dir.join("presets")).map_err(DataError::Io)?;
-        std::fs::create_dir_all(data_dir.join("todos")).map_err(DataError::Io)?;
-        std::fs::create_dir_all(data_dir.join("schedules")).map_err(DataError::Io)?;
+        std::fs::create_dir_all(&data_dir).map_err(|e| DataError::Io(e.to_string()))?;
+        std::fs::create_dir_all(data_dir.join("categories")).map_err(|e| DataError::Io(e.to_string()))?;
+        std::fs::create_dir_all(data_dir.join("timers")).map_err(|e| DataError::Io(e.to_string()))?;
+        std::fs::create_dir_all(data_dir.join("presets")).map_err(|e| DataError::Io(e.to_string()))?;
+        std::fs::create_dir_all(data_dir.join("todos")).map_err(|e| DataError::Io(e.to_string()))?;
+        std::fs::create_dir_all(data_dir.join("schedules")).map_err(|e| DataError::Io(e.to_string()))?;
 
         let presets_dir = data_dir.join("presets");
         let default_preset_path = presets_dir.join("default.json");
         if !default_preset_path.exists() {
             let default_preset = Preset::default_preset();
-            let json = serde_json::to_string_pretty(&default_preset).map_err(DataError::Json)?;
-            std::fs::write(&default_preset_path, json).map_err(DataError::Io)?;
+            let json = serde_json::to_string_pretty(&default_preset).map_err(|e| DataError::Json(e.to_string()))?;
+            std::fs::write(&default_preset_path, json).map_err(|e| DataError::Io(e.to_string()))?;
         }
 
         Ok(Self { data_dir })
@@ -30,7 +30,7 @@ impl DataFs {
 
     pub fn create_tree(&self, name: &str) -> Result<()> {
         let tree_dir = self.data_dir.join("categories").join(name);
-        std::fs::create_dir_all(&tree_dir).map_err(DataError::Io)?;
+        std::fs::create_dir_all(&tree_dir).map_err(|e| DataError::Io(e.to_string()))?;
         Ok(())
     }
 
@@ -71,10 +71,10 @@ impl DataFs {
         let parent_dir = file_path
             .parent()
             .ok_or_else(|| DataError::InvalidPath(path.into()))?;
-        std::fs::create_dir_all(parent_dir).map_err(DataError::Io)?;
+        std::fs::create_dir_all(parent_dir).map_err(|e| DataError::Io(e.to_string()))?;
 
-        let json = serde_json::to_string_pretty(card).map_err(DataError::Json)?;
-        std::fs::write(&file_path, json).map_err(DataError::Io)?;
+        let json = serde_json::to_string_pretty(card).map_err(|e| DataError::Json(e.to_string()))?;
+        std::fs::write(&file_path, json).map_err(|e| DataError::Io(e.to_string()))?;
 
         Ok(())
     }
@@ -91,8 +91,8 @@ impl DataFs {
             return Err(DataError::CardNotFound(path.into()));
         }
 
-        let json = std::fs::read_to_string(&file_path).map_err(DataError::Io)?;
-        let card: Card = serde_json::from_str(&json).map_err(DataError::Json)?;
+        let json = std::fs::read_to_string(&file_path).map_err(|e| DataError::Io(e.to_string()))?;
+        let card: Card = serde_json::from_str(&json).map_err(|e| DataError::Json(e.to_string()))?;
 
         Ok(card)
     }
@@ -137,8 +137,8 @@ impl DataFs {
             .join("timers")
             .join(format!("{}.json", filename));
 
-        let json = serde_json::to_string_pretty(timer).map_err(DataError::Json)?;
-        std::fs::write(&file_path, json).map_err(DataError::Io)?;
+        let json = serde_json::to_string_pretty(timer).map_err(|e| DataError::Json(e.to_string()))?;
+        std::fs::write(&file_path, json).map_err(|e| DataError::Io(e.to_string()))?;
 
         Ok(())
     }
@@ -153,8 +153,8 @@ impl DataFs {
             return Err(DataError::TimerNotFound(filename.into()));
         }
 
-        let json = std::fs::read_to_string(&file_path).map_err(DataError::Io)?;
-        let timer: Timer = serde_json::from_str(&json).map_err(DataError::Json)?;
+        let json = std::fs::read_to_string(&file_path).map_err(|e| DataError::Io(e.to_string()))?;
+        let timer: Timer = serde_json::from_str(&json).map_err(|e| DataError::Json(e.to_string()))?;
 
         Ok(timer)
     }
@@ -189,8 +189,8 @@ impl DataFs {
             .join("presets")
             .join(format!("{}.json", preset.name));
 
-        let json = serde_json::to_string_pretty(preset).map_err(DataError::Json)?;
-        std::fs::write(&file_path, json).map_err(DataError::Io)?;
+        let json = serde_json::to_string_pretty(preset).map_err(|e| DataError::Json(e.to_string()))?;
+        std::fs::write(&file_path, json).map_err(|e| DataError::Io(e.to_string()))?;
 
         Ok(())
     }
@@ -202,8 +202,8 @@ impl DataFs {
             return Err(DataError::PresetNotFound(name.into()));
         }
 
-        let json = std::fs::read_to_string(&file_path).map_err(DataError::Io)?;
-        let preset: Preset = serde_json::from_str(&json).map_err(DataError::Json)?;
+        let json = std::fs::read_to_string(&file_path).map_err(|e| DataError::Io(e.to_string()))?;
+        let preset: Preset = serde_json::from_str(&json).map_err(|e| DataError::Json(e.to_string()))?;
 
         Ok(preset)
     }
@@ -238,8 +238,8 @@ impl DataFs {
             .join("todos")
             .join(format!("{}.json", todo.id));
 
-        let json = serde_json::to_string_pretty(todo).map_err(DataError::Json)?;
-        std::fs::write(&file_path, json).map_err(DataError::Io)?;
+        let json = serde_json::to_string_pretty(todo).map_err(|e| DataError::Json(e.to_string()))?;
+        std::fs::write(&file_path, json).map_err(|e| DataError::Io(e.to_string()))?;
 
         Ok(())
     }
@@ -251,8 +251,8 @@ impl DataFs {
             return Err(DataError::TodoNotFound(id.to_string()));
         }
 
-        let json = std::fs::read_to_string(&file_path).map_err(DataError::Io)?;
-        let todo: Todo = serde_json::from_str(&json).map_err(DataError::Json)?;
+        let json = std::fs::read_to_string(&file_path).map_err(|e| DataError::Io(e.to_string()))?;
+        let todo: Todo = serde_json::from_str(&json).map_err(|e| DataError::Json(e.to_string()))?;
 
         Ok(todo)
     }
@@ -284,7 +284,7 @@ impl DataFs {
     pub fn delete_todo(&self, id: &uuid::Uuid) -> Result<()> {
         let file_path = self.data_dir.join("todos").join(format!("{}.json", id));
         if file_path.exists() {
-            std::fs::remove_file(&file_path).map_err(DataError::Io)?;
+            std::fs::remove_file(&file_path).map_err(|e| DataError::Io(e.to_string()))?;
         }
         Ok(())
     }
@@ -292,7 +292,7 @@ impl DataFs {
     pub fn save_schedule(&self, id: &uuid::Uuid, ics_content: &str) -> Result<()> {
         let file_path = self.data_dir.join("schedules").join(format!("{}.ics", id));
 
-        std::fs::write(&file_path, ics_content).map_err(DataError::Io)?;
+        std::fs::write(&file_path, ics_content).map_err(|e| DataError::Io(e.to_string()))?;
         Ok(())
     }
 
@@ -303,7 +303,7 @@ impl DataFs {
             return Err(DataError::ScheduleNotFound(id.to_string()));
         }
 
-        let content = std::fs::read_to_string(&file_path).map_err(DataError::Io)?;
+        let content = std::fs::read_to_string(&file_path).map_err(|e| DataError::Io(e.to_string()))?;
         Ok(content)
     }
 

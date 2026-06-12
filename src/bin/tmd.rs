@@ -51,9 +51,7 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
                     &rules,
                 )
                 .map_err(|e| {
-                    time_manager::data::DataError::Io(std::io::Error::other(
-                        e,
-                    ))
+                    time_manager::data::DataError::Io(e.to_string())
                 })?;
 
                 println!("Imported {} directories", result.created_dirs.len());
