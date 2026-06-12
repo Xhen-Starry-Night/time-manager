@@ -8,6 +8,7 @@ pub enum TimerState {
     Idle,
     Running {
         started_at: DateTime<Utc>,
+        accumulated: i64,
     },
     Paused {
         started_at: DateTime<Utc>,
@@ -37,22 +38,25 @@ impl TimerState {
             Self::Idle => {
                 *self = Self::Running {
                     started_at: Utc::now(),
+                    accumulated: 0,
                 };
                 Ok(())
             }
             Self::Paused {
-                started_at,
+                started_at: _,
                 paused_at: _,
-                accumulated: _,
+                accumulated,
             } => {
                 *self = Self::Running {
-                    started_at: *started_at,
+                    started_at: Utc::now(),
+                    accumulated: *accumulated,
                 };
                 Ok(())
             }
             Self::Stopped { .. } => {
                 *self = Self::Running {
                     started_at: Utc::now(),
+                    accumulated: 0,
                 };
                 Ok(())
             }
@@ -62,13 +66,17 @@ impl TimerState {
 
     pub fn pause(&mut self) -> Result<(), String> {
         match self {
-            Self::Running { started_at } => {
+            Self::Running {
+                started_at,
+                accumulated,
+            } => {
                 let paused_at = Utc::now();
-                let elapsed = (paused_at - *started_at).num_milliseconds();
+                let current_elapsed = (paused_at - *started_at).num_milliseconds();
+                let total = *accumulated + current_elapsed;
                 *self = Self::Paused {
                     started_at: *started_at,
                     paused_at,
-                    accumulated: elapsed,
+                    accumulated: total,
                 };
                 Ok(())
             }
@@ -79,9 +87,13 @@ impl TimerState {
 
     pub fn stop(&mut self) -> Result<(DateTime<Utc>, i64), String> {
         match self {
-            Self::Running { started_at } => {
+            Self::Running {
+                started_at,
+                accumulated,
+            } => {
                 let stopped_at = Utc::now();
-                let duration_ms = (stopped_at - *started_at).num_milliseconds();
+                let current_elapsed = (stopped_at - *started_at).num_milliseconds();
+                let duration_ms = *accumulated + current_elapsed;
                 *self = Self::Stopped {
                     started_at: *started_at,
                     stopped_at,
@@ -109,7 +121,13 @@ impl TimerState {
 
     pub fn elapsed_ms(&self) -> i64 {
         match self {
-            Self::Running { started_at } => (Utc::now() - *started_at).num_milliseconds(),
+            Self::Running {
+                started_at,
+                accumulated,
+            } => {
+                let current_elapsed = (Utc::now() - *started_at).num_milliseconds();
+                *accumulated + current_elapsed
+            }
             Self::Paused { accumulated, .. } => *accumulated,
             Self::Stopped { duration_ms, .. } => *duration_ms,
             Self::Idle => 0,
