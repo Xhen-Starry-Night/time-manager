@@ -121,6 +121,8 @@ impl App {
     }
     
     fn view(&self) -> Element<Message> {
+        use iced::widget::scrollable;
+        
         let tabs = row![
             tab_button("分类树", TabId::Category, self.active_tab),
             tab_button("复习看板", TabId::Review, self.active_tab),
@@ -133,14 +135,42 @@ impl App {
         .spacing(4)
         .padding(8);
         
-        let content = container(
-            text(format!("{:?} Tab - Under Construction", self.active_tab))
-                .size(24)
-        )
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .center_x(Length::Fill)
-        .center_y(Length::Fill);
+        let content: Element<Message> = match self.active_tab {
+            TabId::Category => {
+                if self.category_tab.tree_nodes.is_empty() {
+                    container(
+                        text("暂无数据 - 请使用 CLI 创建分类树")
+                            .size(16)
+                    )
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .center_x(Length::Fill)
+                    .center_y(Length::Fill)
+                    .into()
+                } else {
+                    let tree_element = self.category_tab.tree_view.view(
+                        &self.category_tab.tree_nodes,
+                        self.category_tab.selected_path.as_deref(),
+                    ).map(|path| Message::CardSelected(path));
+                    
+                    container(scrollable(tree_element))
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                        .into()
+                }
+            }
+            _ => {
+                container(
+                    text(format!("{:?} Tab - Under Construction", self.active_tab))
+                        .size(24)
+                )
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .center_x(Length::Fill)
+                .center_y(Length::Fill)
+                .into()
+            }
+        };
         
         column![tabs, rule::horizontal(1.0), content]
             .width(Length::Fill)
