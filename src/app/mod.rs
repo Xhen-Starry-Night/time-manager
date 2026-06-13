@@ -1691,6 +1691,36 @@ fn simple_edit_card_view(form: &category_tab::EditCardForm, presets: &[String]) 
         
         text(format!("复习记录 ({} 条)", form.review_records.len())).color(iced::Color::WHITE),
         review_list,
+        Space::new().height(8),
+        
+        text("添加新记录:").color(iced::Color::WHITE),
+        row![
+            text_input("时长(分钟)", &form.new_review_duration)
+                .on_input(Message::EditCardNewReviewDurationChanged)
+                .width(Length::Fixed(100.0)),
+            pick_list(
+                vec!["好".to_string(), "简单".to_string(), "困难".to_string(), "重学".to_string()],
+                Some(form.new_review_quality.as_str().to_string()),
+                move |s| {
+                    let quality = crate::data::models::MemoryQuality::from_str(&s)
+                        .unwrap_or(crate::data::models::MemoryQuality::Good);
+                    Message::EditCardNewReviewQualityChanged(quality)
+                }
+            )
+            .width(Length::Fixed(80.0)),
+            button(text("添加").color(iced::Color::WHITE))
+                .on_press(Message::EditCardAddReview)
+                .style(|_, _| iced::widget::button::Style {
+                    background: Some(iced::Color::from_rgb(0.3, 0.5, 0.4).into()),
+                    text_color: iced::Color::WHITE,
+                    border: iced::Border {
+                        radius: 4.0.into(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }),
+        ]
+        .spacing(8),
     ]
     .padding(16)
     .spacing(8)
