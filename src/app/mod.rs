@@ -789,6 +789,28 @@ impl App {
                 children: Vec::new(),
             };
             
+            // 扫描实际目录结构
+            if let Ok(entries) = std::fs::read_dir(self.data_fs.data_dir().join("categories").join(tree_name)) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        let folder_name = path.file_name().unwrap().to_string_lossy().to_string();
+                        let folder_path = format!("{}/{}", tree_name, folder_name);
+                        
+                        // 检查是否已存在该文件夹节点
+                        if !tree_node.children.iter().any(|n| n.path == folder_path) {
+                            let folder_node = TreeNode {
+                                name: folder_name,
+                                path: folder_path,
+                                is_card: false,
+                                children: Vec::new(),
+                            };
+                            tree_node.children.push(folder_node);
+                        }
+                    }
+                }
+            }
+            
             for (card_path, _card) in tree_cards {
                 let relative_path = card_path.strip_prefix(&format!("{}/", tree_name)).unwrap_or(&card_path);
                 let parts: Vec<&str> = relative_path.split('/').collect();

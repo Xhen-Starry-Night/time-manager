@@ -10,6 +10,10 @@ pub struct DataFs {
 }
 
 impl DataFs {
+    pub fn data_dir(&self) -> &PathBuf {
+        &self.data_dir
+    }
+    
     pub fn init(data_dir: PathBuf) -> Result<Self> {
         std::fs::create_dir_all(&data_dir).map_err(|e| DataError::Io(e.to_string()))?;
         std::fs::create_dir_all(data_dir.join("categories")).map_err(|e| DataError::Io(e.to_string()))?;
