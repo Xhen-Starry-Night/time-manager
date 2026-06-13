@@ -10,6 +10,7 @@ pub struct TreeNode {
     pub children: Vec<TreeNode>,
 }
 
+#[derive(Debug, Clone)]
 pub struct TreeView {
     expanded: HashMap<String, bool>,
 }
@@ -23,7 +24,7 @@ impl Default for TreeView {
 }
 
 impl TreeView {
-    pub fn view(&self, nodes: &[TreeNode], selected: Option<&str>) -> Element<String> {
+    pub fn view<'a>(&'a self, nodes: &'a [TreeNode], selected: Option<&'a str>) -> Element<'a, String> {
         column(nodes.iter().map(|node| self.view_node(node, selected, 0)))
             .spacing(2)
             .into()

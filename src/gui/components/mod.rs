@@ -6,6 +6,7 @@ pub mod modal;
 pub mod new_todo_form;
 pub mod new_node_modal;
 pub mod link_timer_modal;
+pub mod tree_picker;
 
 pub use tree_view::TreeView;
 pub use card_detail::CardDetail;
@@ -15,3 +16,4 @@ pub use modal::ModalView;
 pub use new_todo_form::NewTodoForm;
 pub use new_node_modal::NewNodeModal;
 pub use link_timer_modal::LinkTimerModal;
+pub use tree_picker::TreePicker;

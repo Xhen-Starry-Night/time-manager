@@ -11,7 +11,7 @@ use chrono::Utc;
 use crate::data::DataFs;
 use crate::data::models::{Card, Todo};
 use crate::gui::{Message, TabId, Modal, DataSnapshot, NodeType};
-use crate::gui::components::{tree_view::TreeNode, ModalView, NewTodoForm, NewNodeModal};
+use crate::gui::components::{tree_view::TreeNode, ModalView, NewTodoForm, NewNodeModal, TreeView};
 use crate::timer::TimerManager;
 
 pub mod category_tab;
