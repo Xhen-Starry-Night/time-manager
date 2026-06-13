@@ -84,19 +84,27 @@ pub enum Commands {
     TimerGet { name: String },
 
     #[command(name = "todo-create")]
-    TodoCreate { content: String },
+    TodoCreate {
+        content: String,
+        #[arg(short, long)]
+        due: Option<String>,
+        #[arg(short, long)]
+        priority: Option<u32>,
+        #[arg(short = 't', long)]
+        tags: Option<String>,
+    },
 
     #[command(name = "todo-list")]
-    TodoList,
-
-    #[command(name = "todo-to-schedule")]
-    TodoToSchedule {
-        id: String,
+    TodoList {
         #[arg(short, long)]
-        start: String,
-        #[arg(short, long)]
-        end: String,
+        show_completed: bool,
     },
+
+    #[command(name = "todo-complete")]
+    TodoComplete { id: String },
+
+    #[command(name = "todo-delete")]
+    TodoDelete { id: String },
 
     #[command(name = "schedule-create")]
     ScheduleCreate {

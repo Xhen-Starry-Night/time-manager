@@ -237,23 +237,24 @@ impl DataFs {
         let file_path = self
             .data_dir
             .join("todos")
-            .join(format!("{}.json", todo.id));
+            .join(format!("{}.ics", todo.id));
 
-        let json = serde_json::to_string_pretty(todo).map_err(|e| DataError::Json(e.to_string()))?;
-        std::fs::write(&file_path, json).map_err(|e| DataError::Io(e.to_string()))?;
+        let ics = todo.to_ics();
+        std::fs::write(&file_path, ics).map_err(|e| DataError::Io(e.to_string()))?;
 
         Ok(())
     }
 
     pub fn get_todo(&self, id: &uuid::Uuid) -> Result<Todo> {
-        let file_path = self.data_dir.join("todos").join(format!("{}.json", id));
+        let file_path = self.data_dir.join("todos").join(format!("{}.ics", id));
 
         if !file_path.exists() {
             return Err(DataError::TodoNotFound(id.to_string()));
         }
 
-        let json = std::fs::read_to_string(&file_path).map_err(|e| DataError::Io(e.to_string()))?;
-        let todo: Todo = serde_json::from_str(&json).map_err(|e| DataError::Json(e.to_string()))?;
+        let ics = std::fs::read_to_string(&file_path).map_err(|e| DataError::Io(e.to_string()))?;
+        let todo = Todo::from_ics(&ics)
+            .ok_or_else(|| DataError::InvalidData("Failed to parse ICS".to_string()))?;
 
         Ok(todo)
     }
@@ -270,12 +271,12 @@ impl DataFs {
             .filter(|e| {
                 e.path()
                     .extension()
-                    .map(|ext| ext == "json")
+                    .map(|ext| ext == "ics")
                     .unwrap_or(false)
             })
             .filter_map(|e| {
-                let json = std::fs::read_to_string(e.path()).ok()?;
-                serde_json::from_str::<Todo>(&json).ok()
+                let ics = std::fs::read_to_string(e.path()).ok()?;
+                Todo::from_ics(&ics)
             })
             .collect();
 
@@ -283,7 +284,7 @@ impl DataFs {
     }
 
     pub fn delete_todo(&self, id: &uuid::Uuid) -> Result<()> {
-        let file_path = self.data_dir.join("todos").join(format!("{}.json", id));
+        let file_path = self.data_dir.join("todos").join(format!("{}.ics", id));
         if file_path.exists() {
             std::fs::remove_file(&file_path).map_err(|e| DataError::Io(e.to_string()))?;
         }
@@ -333,5 +334,72 @@ impl DataFs {
             .collect();
 
         Ok(schedules)
+    }
+
+    pub fn delete_card(&self, path: &str) -> Result<()> {
+        let (tree, card_path) = Self::parse_path(path)?;
+        let file_path = self
+            .data_dir
+            .join("categories")
+            .join(&tree)
+            .join(format!("{}.json", card_path));
+        
+        if !file_path.exists() {
+            return Err(DataError::CardNotFound(path.into()));
+        }
+        
+        std::fs::remove_file(&file_path)
+            .map_err(|e| DataError::Io(e.to_string()))?;
+        
+        Ok(())
+    }
+
+    pub fn delete_folder(&self, path: &str) -> Result<()> {
+        let (tree, folder_path) = Self::parse_path(path)?;
+        let dir_path = self
+            .data_dir
+            .join("categories")
+            .join(&tree)
+            .join(folder_path);
+        
+        if !dir_path.exists() {
+            return Err(DataError::FolderNotFound(path.into()));
+        }
+        
+        std::fs::remove_dir_all(&dir_path)
+            .map_err(|e| DataError::Io(e.to_string()))?;
+        
+        Ok(())
+    }
+
+    pub fn rename_card(&self, old_path: &str, new_name: &str) -> Result<String> {
+        let (tree, old_card_path) = Self::parse_path(old_path)?;
+        
+        let old_path_buf = std::path::Path::new(&old_card_path);
+        let parent = old_path_buf.parent()
+            .ok_or_else(|| DataError::InvalidPath(old_path.into()))?;
+        let new_card_path = parent.join(new_name);
+        let new_card_path_str = new_card_path.to_string_lossy();
+        let new_full_path = format!("{}/{}", tree, new_card_path_str);
+        
+        let old_file = self
+            .data_dir
+            .join("categories")
+            .join(&tree)
+            .join(format!("{}.json", old_card_path));
+        let new_file = self
+            .data_dir
+            .join("categories")
+            .join(&tree)
+            .join(format!("{}.json", new_card_path_str));
+        
+        if new_file.exists() {
+            return Err(DataError::NodeAlreadyExists(new_full_path));
+        }
+        
+        std::fs::rename(&old_file, &new_file)
+            .map_err(|e| DataError::Io(e.to_string()))?;
+        
+        Ok(new_full_path)
     }
 }

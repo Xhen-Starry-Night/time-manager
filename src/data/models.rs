@@ -141,16 +141,131 @@ impl Preset {
 pub struct Todo {
     pub id: Uuid,
     pub content: String,
+    pub completed: bool,
     pub created_at: DateTime<Utc>,
+    pub due_date: Option<DateTime<Utc>>,
+    pub priority: Option<u32>,
+    pub tags: Vec<String>,
+    pub notes: Option<String>,
+    pub completed_at: Option<DateTime<Utc>>,
 }
 
-impl Todo {
+ 
+ impl Todo {
     pub fn new(content: String) -> Self {
         Self {
             id: Uuid::new_v4(),
             content,
+            completed: false,
             created_at: Utc::now(),
+            due_date: None,
+            priority: None,
+            tags: Vec::new(),
+            notes: None,
+            completed_at: None,
         }
+    }
+    
+    pub fn to_ics(&self) -> String {
+        let status = if self.completed { "COMPLETED" } else { "NEEDS-ACTION" };
+        let mut ics = format!(
+            "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//time-manager-todo\nBEGIN:VTODO\nUID:{}\nDTSTART:{}\nSUMMARY:{}\nSTATUS:{}",
+            self.id,
+            self.created_at.format("%Y%m%dT%H%M%SZ"),
+            self.content,
+            status
+        );
+        
+        if let Some(due) = self.due_date {
+            ics.push_str(&format!("\nDUE:{}", due.format("%Y%m%dT%H%M%SZ")));
+        }
+        
+        if let Some(p) = self.priority {
+            ics.push_str(&format!("\nPRIORITY:{}", p));
+        }
+        
+        if !self.tags.is_empty() {
+            ics.push_str(&format!("\nCATEGORIES:{}", self.tags.join(",")));
+        }
+        
+        if let Some(ref notes) = self.notes {
+            ics.push_str(&format!("\nDESCRIPTION:{}", notes));
+        }
+        
+        if let Some(completed) = self.completed_at {
+            ics.push_str(&format!("\nCOMPLETED:{}", completed.format("%Y%m%dT%H%M%SZ")));
+        }
+        
+        ics.push_str("\nEND:VTODO\nEND:VCALENDAR\n");
+        ics
+    }
+    
+    pub fn from_ics(ics_content: &str) -> Option<Self> {
+        let lines: Vec<&str> = ics_content.lines().collect();
+        
+        let id = lines.iter()
+            .find(|line| line.starts_with("UID:"))
+            .and_then(|line| line.strip_prefix("UID:"))
+            .and_then(|s| Uuid::parse_str(s).ok())?;
+        
+        let content = lines.iter()
+            .find(|line| line.starts_with("SUMMARY:"))
+            .and_then(|line| line.strip_prefix("SUMMARY:"))
+            .unwrap_or("未知待办")
+            .to_string();
+        
+        let completed = lines.iter()
+            .find(|line| line.starts_with("STATUS:"))
+            .and_then(|line| line.strip_prefix("STATUS:"))
+            .map(|s| s == "COMPLETED")
+            .unwrap_or(false);
+        
+        let created_at = lines.iter()
+            .find(|line| line.starts_with("DTSTART:"))
+            .and_then(|line| line.strip_prefix("DTSTART:"))
+            .and_then(|s| chrono::NaiveDateTime::parse_from_str(s, "%Y%m%dT%H%M%SZ").ok())
+            .map(|dt| DateTime::from_naive_utc_and_offset(dt, Utc))
+            .unwrap_or_else(Utc::now);
+        
+        let due_date = lines.iter()
+            .find(|line| line.starts_with("DUE:"))
+            .and_then(|line| line.strip_prefix("DUE:"))
+            .and_then(|s| chrono::NaiveDateTime::parse_from_str(s, "%Y%m%dT%H%M%SZ").ok())
+            .map(|dt| DateTime::from_naive_utc_and_offset(dt, Utc));
+        
+        let priority = lines.iter()
+            .find(|line| line.starts_with("PRIORITY:"))
+            .and_then(|line| line.strip_prefix("PRIORITY:"))
+            .and_then(|s| s.parse::<u32>().ok());
+        
+        let tags = lines.iter()
+            .find(|line| line.starts_with("CATEGORIES:"))
+            .and_then(|line| line.strip_prefix("CATEGORIES:"))
+            .map(|s| s.split(",").map(String::from).collect())
+            .unwrap_or_default();
+        
+        let notes = lines.iter()
+            .find(|line| line.starts_with("DESCRIPTION:"))
+            .and_then(|line| line.strip_prefix("DESCRIPTION:"))
+            .map(String::from);
+        
+        let completed_at = lines.iter()
+            .find(|line| line.starts_with("COMPLETED:"))
+            .and_then(|line| line.strip_prefix("COMPLETED:"))
+            .and_then(|s| chrono::NaiveDateTime::parse_from_str(s, "%Y%m%dT%H%M%SZ").ok())
+            .map(|dt| DateTime::from_naive_utc_and_offset(dt, Utc));
+        
+        Some(Self {
+            id,
+            content,
+            completed,
+            created_at,
+            due_date,
+            priority,
+            tags,
+            notes,
+            completed_at,
+        })
     }
 }
 

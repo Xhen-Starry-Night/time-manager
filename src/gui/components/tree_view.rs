@@ -86,4 +86,20 @@ impl TreeView {
             }
         }
     }
+    
+    pub fn expand_to_path(&mut self, nodes: &[TreeNode], target_path: &str) {
+        for node in nodes {
+            if target_path.starts_with(&node.path) {
+                if !node.is_card {
+                    self.expanded.insert(node.path.clone(), true);
+                    self.expand_to_path(&node.children, target_path);
+                }
+                return;
+            }
+        }
+    }
+    
+    pub fn is_expanded(&self, path: &str) -> bool {
+        self.expanded.get(path).copied().unwrap_or(true)
+    }
 }

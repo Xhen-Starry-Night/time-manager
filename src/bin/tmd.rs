@@ -336,39 +336,78 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
             println!("Duration: {}ms", timer.duration_ms);
         }
 
-        TodoCreate { content } => {
+        TodoCreate { content, due, priority, tags } => {
             let fs = DataFs::init(data_dir)?;
-            let todo = time_manager::data::models::Todo::new(content);
+            let mut todo = time_manager::data::models::Todo::new(content);
+            
+            if let Some(due_str) = due {
+                todo.due_date = chrono::NaiveDateTime::parse_from_str(&due_str, "%Y%m%dT%H%M%SZ")
+                    .ok()
+                    .map(|dt| chrono::DateTime::from_naive_utc_and_offset(dt, chrono::Utc));
+            }
+            
+            todo.priority = priority;
+            
+            if let Some(tags_str) = tags {
+                todo.tags = tags_str.split(",").map(String::from).collect();
+            }
+            
             let id = todo.id;
             fs.save_todo(&todo)?;
             println!("Created todo: {}", id);
         }
 
-        TodoList => {
+        TodoList { show_completed } => {
             let fs = DataFs::init(data_dir)?;
             let todos = fs.list_todos()?;
             for todo in todos {
-                println!("{}: {}", todo.id, todo.content);
+                if !show_completed && todo.completed {
+                    continue;
+                }
+                let status = if todo.completed { "✓" } else { "○" };
+                let priority_str = todo.priority
+                    .map(|p| format!(" [P{}]", p))
+                    .unwrap_or_default();
+                let due_str = todo.due_date
+                    .map(|d| format!(" (due: {})", d.format("%m-%d %H:%M")))
+                    .unwrap_or_default();
+                let tags_str = if todo.tags.is_empty() {
+                    String::new()
+                } else {
+                    format!(" #{}", todo.tags.join(",#"))
+                };
+                println!("{} {}{}{}{}: {}", status, todo.id, priority_str, due_str, tags_str, todo.content);
             }
         }
 
-        TodoToSchedule { id, start, end } => {
+        TodoComplete { id } => {
+            let fs = DataFs::init(data_dir)?;
+            let uuid = uuid::Uuid::parse_str(&id).map_err(|_| {
+                time_manager::data::DataError::InvalidData(format!("Invalid UUID: {}", id))
+            })?;
+
+            let mut todo = fs.get_todo(&uuid)?;
+            todo.completed = !todo.completed;
+            if todo.completed {
+                todo.completed_at = Some(chrono::Utc::now());
+            } else {
+                todo.completed_at = None;
+            }
+            fs.save_todo(&todo)?;
+
+            let status = if todo.completed { "completed" } else { "uncompleted" };
+            println!("Todo marked as {}: {}", status, todo.content);
+        }
+
+        TodoDelete { id } => {
             let fs = DataFs::init(data_dir)?;
             let uuid = uuid::Uuid::parse_str(&id).map_err(|_| {
                 time_manager::data::DataError::InvalidData(format!("Invalid UUID: {}", id))
             })?;
 
             let todo = fs.get_todo(&uuid)?;
-
-            let ics_content = format!(
-                "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART:{}\nDTEND:{}\nSUMMARY:{}\nEND:VEVENT\nEND:VCALENDAR",
-                start, end, todo.content
-            );
-
-            let schedule_id = uuid::Uuid::new_v4();
-            fs.save_schedule(&schedule_id, &ics_content)?;
             fs.delete_todo(&uuid)?;
-            println!("Converted todo to schedule: {}", schedule_id);
+            println!("Deleted todo: {}", todo.content);
         }
 
         ScheduleCreate {

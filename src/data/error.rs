@@ -26,6 +26,15 @@ pub enum DataError {
     #[error("schedule not found: {0}")]
     ScheduleNotFound(String),
 
+    #[error("folder not found: {0}")]
+    FolderNotFound(String),
+
+    #[error("invalid node name: {0}")]
+    InvalidNodeName(String),
+
+    #[error("node already exists: {0}")]
+    NodeAlreadyExists(String),
+
     #[error("invalid data: {0}")]
     InvalidData(String),
 }
