@@ -32,6 +32,9 @@ pub enum Message {
     TimerMemoryQualityChanged(MemoryQuality),
     TimerLinkConfirm,
     TimerCreateNewCard,
+    TimerNewCardNameChanged(String),
+    TimerNewCardPresetChanged(String),
+    TimerNewCardConfirm,
     
     TimerHistoryLoad,
     TimerHistoryLoaded(Vec<crate::app::timer_tab::TimerRecord>),

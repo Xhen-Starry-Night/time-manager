@@ -565,7 +565,8 @@ impl App {
                 Task::none()
             }
             
-            Message::StartReviewTimer(_path) => {
+            Message::StartReviewTimer(path) => {
+                self.timer_tab.current_card = Some(path);
                 self.active_tab = TabId::Timer;
                 let _ = self.timer_manager.start();
                 self.timer_tab.state = self.timer_manager.get_state().clone();
@@ -641,14 +642,20 @@ impl App {
             Message::TimerStopped(result) => {
                 match result {
                     Ok(_path) => {
+                        // 先保存计时时间，再停止计时器
+                        let final_elapsed = self.timer_tab.elapsed_ms;
                         self.timer_manager.stop();
                         self.timer_tab.state = self.timer_manager.get_state().clone();
-                        self.timer_tab.elapsed_ms = 0;
                         
                         // 如果有预设卡片路径，进入链接模式
                         if let Some(card_path) = self.timer_tab.current_card.take() {
                             self.timer_tab.link_mode = true;
                             self.timer_tab.card_path_input = card_path;
+                            self.timer_tab.elapsed_ms = final_elapsed;
+                        } else {
+                            // 即使没有关联卡片，也进入链接模式
+                            self.timer_tab.link_mode = true;
+                            self.timer_tab.elapsed_ms = final_elapsed;
                         }
                     }
                     Err(e) => {
@@ -689,7 +696,16 @@ impl App {
             }
             
             Message::TimerLinkConfirm => {
-                if let Some(card_path) = &self.timer_tab.selected_card {
+                // 使用卡片路径输入或下拉选择的卡片
+                let card_path = if !self.timer_tab.card_path_input.is_empty() {
+                    self.timer_tab.card_path_input.clone()
+                } else if let Some(ref selected) = self.timer_tab.selected_card {
+                    selected.clone()
+                } else {
+                    String::new()
+                };
+                
+                if !card_path.is_empty() {
                     let duration_ms = self.timer_tab.elapsed_ms;
                     let quality = self.timer_tab.memory_quality.clone();
                     
@@ -701,7 +717,7 @@ impl App {
                     };
                     
                     // 保存到卡片
-                    if let Ok(mut card) = self.data_fs.get_card(card_path) {
+                    if let Ok(mut card) = self.data_fs.get_card(&card_path) {
                         card.review_records.push(record);
                         
                         // 触发 FSRS 预测
@@ -720,16 +736,48 @@ impl App {
                             }
                         }
                         
-                        let _ = self.data_fs.save_card(card_path, &card);
+                        let _ = self.data_fs.save_card(&card_path, &card);
                     }
                     
                     self.timer_tab.link_mode = false;
+                    self.timer_tab.elapsed_ms = 0;
                 }
                 Task::none()
             }
             
             Message::TimerCreateNewCard => {
-                // 创建新卡片逻辑
+                self.timer_tab.show_new_card_form = true;
+                Task::none()
+            }
+            
+            Message::TimerNewCardNameChanged(name) => {
+                self.timer_tab.new_card_name = name;
+                Task::none()
+            }
+            
+            Message::TimerNewCardPresetChanged(preset) => {
+                self.timer_tab.new_card_preset = preset;
+                Task::none()
+            }
+            
+            Message::TimerNewCardConfirm => {
+                if !self.timer_tab.new_card_name.is_empty() {
+                    let parent_path = self.timer_tab.card_path_input.clone();
+                    let card_name = self.timer_tab.new_card_name.clone();
+                    let preset = self.timer_tab.new_card_preset.clone();
+                    let new_path = if parent_path.is_empty() {
+                        card_name.clone()
+                    } else {
+                        format!("{}/{}", parent_path, card_name)
+                    };
+                    
+                    let card = Card::new_with_preset(preset);
+                    if let Ok(()) = self.data_fs.save_card(&new_path, &card) {
+                        self.timer_tab.card_path_input = new_path;
+                        self.timer_tab.show_new_card_form = false;
+                        self.timer_tab.new_card_name.clear();
+                    }
+                }
                 Task::none()
             }
             
@@ -1377,8 +1425,11 @@ impl App {
                     let card_dropdown = self.timer_tab.card_dropdown.clone();
                     let selected_card = self.timer_tab.selected_card.clone();
                     let memory_quality = self.timer_tab.memory_quality.clone();
+                    let show_new_card_form = self.timer_tab.show_new_card_form;
+                    let new_card_name = self.timer_tab.new_card_name.clone();
+                    let new_card_preset = self.timer_tab.new_card_preset.clone();
                     
-                    view_link_timer_modal(duration_ms, card_path, card_dropdown, selected_card, memory_quality)
+                    view_link_timer_modal(duration_ms, card_path, card_dropdown, selected_card, memory_quality, show_new_card_form, new_card_name, new_card_preset)
                 } else {
                     let timer_display = TimerDisplay::view(&self.timer_tab.state, self.timer_tab.elapsed_ms, self.timer_tab.current_card.as_deref())
                         .map(|_| Message::ClearError);
@@ -2149,6 +2200,9 @@ fn view_link_timer_modal(
     card_dropdown: Vec<String>,
     selected_card: Option<String>,
     memory_quality: crate::data::models::MemoryQuality,
+    show_new_card_form: bool,
+    new_card_name: String,
+    new_card_preset: String,
 ) -> Element<'static, Message> {
     use iced::widget::{button, column, row, text, container, text_input, pick_list, Space};
     use iced::{Length, Color};
@@ -2158,17 +2212,15 @@ fn view_link_timer_modal(
     let hours = minutes / 60;
     
     let duration_text = if hours > 0 {
-        format!("{}小时 {}分钟 {}秒", hours, minutes % 60, seconds % 60)
+        format!("{}小时 {:02}分钟 {:02}秒", hours, minutes % 60, seconds % 60)
     } else if minutes > 0 {
-        format!("{}分钟 {}秒", minutes, seconds % 60)
+        format!("{}分钟 {:02}秒", minutes, seconds % 60)
     } else {
         format!("{}秒", seconds)
     };
     
     container(
         column![
-            text("计时完成").size(20).color(Color::WHITE),
-            
             text(format!("学习时长: {}", duration_text))
                 .size(16)
                 .color(Color::WHITE),
@@ -2177,14 +2229,14 @@ fn view_link_timer_modal(
             
             // 卡片路径输入（手动输入）
             row![
-                text("关联到卡片:").color(Color::WHITE),
+                text("关联:").color(Color::WHITE),
                 text_input("输入卡片路径...", &card_path)
                     .on_input(Message::TimerCardPathChanged),
             ],
             
-            // 或下拉选择
+            // 下拉选择
             row![
-                text("或选择:").color(Color::WHITE),
+                text("选择:").color(Color::WHITE),
                 pick_list(
                     card_dropdown.clone(),
                     selected_card.clone(),
@@ -2192,9 +2244,35 @@ fn view_link_timer_modal(
                 ),
             ],
             
-            // 或创建新卡片
-            button(text("创建新卡片..."))
+            // 连接到新卡片
+            button(text("连接到新卡片..."))
                 .on_press(Message::TimerCreateNewCard),
+            
+            // 新卡片输入表单
+            if show_new_card_form {
+                let new_card_form: Element<Message> = column![
+                    Space::new().height(8),
+                    row![
+                        text("名称:").color(Color::WHITE),
+                        text_input("输入卡片名称...", &new_card_name)
+                            .on_input(Message::TimerNewCardNameChanged),
+                    ]
+                    .spacing(8),
+                    row![
+                        text("预设:").color(Color::WHITE),
+                        text_input("default", &new_card_preset)
+                            .on_input(Message::TimerNewCardPresetChanged),
+                    ]
+                    .spacing(8),
+                    button(text("创建").color(Color::WHITE))
+                        .on_press(Message::TimerNewCardConfirm),
+                ]
+                .spacing(8)
+                .into();
+                new_card_form
+            } else {
+                Space::new().height(0).into()
+            },
             
             Space::new().height(16),
             

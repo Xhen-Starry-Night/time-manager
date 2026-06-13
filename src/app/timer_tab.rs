@@ -16,6 +16,9 @@ pub struct TimerTabState {
     pub show_history: bool,
     pub timer_history: Vec<TimerRecord>,
     pub current_card: Option<String>,
+    pub show_new_card_form: bool,
+    pub new_card_name: String,
+    pub new_card_preset: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,6 +44,9 @@ impl TimerTabState {
             show_history: false,
             timer_history: Vec::new(),
             current_card: None,
+            show_new_card_form: false,
+            new_card_name: String::new(),
+            new_card_preset: "default".to_string(),
         }
     }
 }

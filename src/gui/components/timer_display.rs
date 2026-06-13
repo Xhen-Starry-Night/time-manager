@@ -53,6 +53,7 @@ impl TimerDisplay {
             // 状态标签
             container(text(status_label).size(16).color(status_color))
                 .padding([4, 12])
+                .center_x(Length::Fill)
         ]
         .spacing(16)
         .width(Length::Fill)
