@@ -34,6 +34,17 @@ impl DataFs {
         std::fs::create_dir_all(&tree_dir).map_err(|e| DataError::Io(e.to_string()))?;
         Ok(())
     }
+    
+    pub fn create_folder(&self, path: &str) -> Result<()> {
+        let (tree, folder_path) = Self::parse_path(path)?;
+        let dir_path = self
+            .data_dir
+            .join("categories")
+            .join(&tree)
+            .join(folder_path);
+        std::fs::create_dir_all(&dir_path).map_err(|e| DataError::Io(e.to_string()))?;
+        Ok(())
+    }
 
     pub fn list_trees(&self) -> Result<Vec<String>> {
         let categories_dir = self.data_dir.join("categories");

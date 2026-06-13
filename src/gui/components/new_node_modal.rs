@@ -51,34 +51,6 @@ impl NewNodeModal {
             None
         };
         
-        let buttons = row![
-            button(text("取消").color(iced::Color::WHITE))
-                .on_press(Message::ModalClose)
-                .style(|_, _| iced::widget::button::Style {
-                    background: Some(iced::Color::from_rgb(0.4, 0.4, 0.4).into()),
-                    text_color: iced::Color::WHITE,
-                    border: iced::Border {
-                        radius: 4.0.into(),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                }),
-            button(text("创建").color(iced::Color::WHITE))
-                .on_press(Message::NewNodeConfirm)
-                .style(|_, _| iced::widget::button::Style {
-                    background: Some(iced::Color::from_rgb(0.3, 0.6, 0.4).into()),
-                    text_color: iced::Color::WHITE,
-                    border: iced::Border {
-                        radius: 4.0.into(),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                }),
-        ]
-        .spacing(8)
-        .width(Length::Fill)
-        .push(Space::new().width(Length::Fill));
-        
         let mut content = column![
             path_preview,
             Space::new().height(16),
@@ -97,8 +69,6 @@ impl NewNodeModal {
         }
         
         content
-            .push(Space::new().height(24))
-            .push(buttons)
             .padding(16)
             .into()
     }

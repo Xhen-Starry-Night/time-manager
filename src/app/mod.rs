@@ -295,7 +295,7 @@ impl App {
                     
                     let result = match form.node_type {
                         NodeType::Folder => {
-                            self.data_fs.create_tree(&new_path)
+                            self.data_fs.create_folder(&new_path)
                         }
                         NodeType::Card => {
                             let card = Card::new_with_preset(form.preset.clone());
@@ -1477,20 +1477,27 @@ impl App {
             let modal_title = match modal {
                 Modal::NewTodo => "新建待办",
                 Modal::EditTodo { .. } => "编辑待办",
+                Modal::NewNode => "新建节点",
+                Modal::EditCard { .. } => "编辑卡片",
+                Modal::ConfirmDelete { .. } => "确认删除",
+                Modal::Error { .. } => "错误",
                 _ => "确认",
             };
             
-            let modal_content = match modal {
+            let (modal_content, on_confirm_tuple) = match modal {
                 Modal::NewTodo | Modal::EditTodo { .. } => {
-                    NewTodoForm::view(
-                        &self.todo_tab.form_content,
-                        self.todo_tab.form_priority,
-                        &self.todo_tab.form_due_year,
-                        &self.todo_tab.form_due_month,
-                        &self.todo_tab.form_due_day,
-                        &self.todo_tab.form_due_hour,
-                        &self.todo_tab.form_due_minute,
-                        &self.todo_tab.form_tags,
+                    (
+                        NewTodoForm::view(
+                            &self.todo_tab.form_content,
+                            self.todo_tab.form_priority,
+                            &self.todo_tab.form_due_year,
+                            &self.todo_tab.form_due_month,
+                            &self.todo_tab.form_due_day,
+                            &self.todo_tab.form_due_hour,
+                            &self.todo_tab.form_due_minute,
+                            &self.todo_tab.form_tags,
+                        ),
+                        (Message::ModalConfirm, "确认", true),
                     )
                 }
                 Modal::ConfirmDelete { item } => {
@@ -1505,37 +1512,43 @@ impl App {
                         "⚠️ 此操作不可撤销"
                     };
                     
-                    column![
-                        text(format!("确定要删除 \"{}\" 吗？", item))
-                            .color(iced::Color::WHITE)
-                            .size(16),
-                        Space::new().height(12),
-                        text(warning)
-                            .color(iced::Color::from_rgb(0.9, 0.5, 0.3))
-                            .size(14),
-                    ]
-                    .spacing(12)
-                    .into()
+                    (
+                        column![
+                            text(format!("确定要删除 \"{}\" 吗？", item))
+                                .color(iced::Color::WHITE)
+                                .size(16),
+                            Space::new().height(12),
+                            text(warning)
+                                .color(iced::Color::from_rgb(0.9, 0.5, 0.3))
+                                .size(14),
+                        ]
+                        .spacing(12)
+                        .into(),
+                        (Message::DeleteNodeConfirm, "删除", true),
+                    )
                 }
                 Modal::Error { message } => {
-                    column![
-                        text("错误")
-                            .color(iced::Color::WHITE)
-                            .size(16),
-                        text(message.clone())
-                            .color(iced::Color::from_rgb(0.9, 0.3, 0.2)),
-                    ]
-                    .spacing(12)
-                    .into()
+                    (
+                        column![
+                            text("错误")
+                                .color(iced::Color::WHITE)
+                                .size(16),
+                            text(message.clone())
+                                .color(iced::Color::from_rgb(0.9, 0.3, 0.2)),
+                        ]
+                        .spacing(12)
+                        .into(),
+                        (Message::ModalClose, "关闭", false),
+                    )
                 }
                 Modal::NewNode => {
                     if let Some(ref form) = self.category_tab.new_node_form {
                         let presets: Vec<String> = self.preset_tab.presets.iter()
                             .map(|p| p.name.clone())
                             .collect();
-                        NewNodeModal::view(form, &presets)
+                        (NewNodeModal::view(form, &presets), (Message::NewNodeConfirm, "创建", true))
                     } else {
-                        text("开发中").color(iced::Color::WHITE).into()
+                        (text("开发中").color(iced::Color::WHITE).into(), (Message::ModalClose, "关闭", false))
                     }
                 }
                 Modal::EditCard { .. } => {
@@ -1543,20 +1556,35 @@ impl App {
                         let presets: Vec<String> = self.preset_tab.presets.iter()
                             .map(|p| p.name.clone())
                             .collect();
-                        simple_edit_card_view(form, &presets)
+                        (simple_edit_card_view(form, &presets), (Message::EditCardConfirm, "保存", true))
                     } else {
-                        text("开发中").color(iced::Color::WHITE).into()
+                        (text("开发中").color(iced::Color::WHITE).into(), (Message::ModalClose, "关闭", false))
                     }
                 }
-                _ => text("开发中").color(iced::Color::WHITE).into()
+                _ => (text("开发中").color(iced::Color::WHITE).into(), (Message::ModalClose, "关闭", false))
             };
             
-            ModalView::view(
-                modal_title,
-                modal_content,
-                Message::ModalConfirm,
-                Message::ModalClose,
-            )
+            let (on_confirm, confirm_label, show_cancel) = on_confirm_tuple;
+            
+            if show_cancel {
+                ModalView::view_with_options(
+                    modal_title,
+                    modal_content,
+                    on_confirm,
+                    Message::ModalClose,
+                    confirm_label,
+                    true,
+                )
+            } else {
+                ModalView::view_with_options(
+                    modal_title,
+                    modal_content,
+                    on_confirm,
+                    Message::ModalClose,
+                    confirm_label,
+                    false,
+                )
+            }
         } else {
             base_view.into()
         }
@@ -1641,35 +1669,6 @@ fn simple_edit_card_view(form: &category_tab::EditCardForm, presets: &[String]) 
         
         text(format!("复习记录 ({} 条)", form.review_records.len())).color(iced::Color::WHITE),
         review_list,
-        Space::new().height(24),
-        
-        row![
-            button(text("取消").color(iced::Color::WHITE))
-                .on_press(Message::ModalClose)
-                .style(|_, _| iced::widget::button::Style {
-                    background: Some(iced::Color::from_rgb(0.4, 0.4, 0.4).into()),
-                    text_color: iced::Color::WHITE,
-                    border: iced::Border {
-                        radius: 4.0.into(),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                }),
-            button(text("保存").color(iced::Color::WHITE))
-                .on_press(Message::EditCardConfirm)
-                .style(|_, _| iced::widget::button::Style {
-                    background: Some(iced::Color::from_rgb(0.3, 0.6, 0.4).into()),
-                    text_color: iced::Color::WHITE,
-                    border: iced::Border {
-                        radius: 4.0.into(),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                }),
-        ]
-        .spacing(8)
-        .width(Length::Fill)
-        .push(Space::new().width(Length::Fill)),
     ]
     .padding(16)
     .spacing(8)

@@ -10,6 +10,17 @@ impl ModalView {
         on_confirm: Message,
         on_cancel: Message,
     ) -> Element<'a, Message> {
+        Self::view_with_options(title, content, on_confirm, on_cancel, "确认", true)
+    }
+    
+    pub fn view_with_options<'a, Message: Clone + 'a>(
+        title: &'a str,
+        content: Element<'a, Message>,
+        on_confirm: Message,
+        on_cancel: Message,
+        confirm_label: &'a str,
+        show_cancel: bool,
+    ) -> Element<'a, Message> {
         let close_btn = button(text("✕").color(Color::WHITE))
             .on_press(on_cancel.clone())
             .style(|_, _| iced::widget::button::Style {
@@ -27,15 +38,7 @@ impl ModalView {
         .width(Length::Fill)
         .align_y(Alignment::Center);
 
-        let cancel_btn = button(text("取消").color(Color::WHITE))
-            .on_press(on_cancel)
-            .style(|_, _| iced::widget::button::Style {
-                background: Some(Color::from_rgb(0.3, 0.3, 0.3).into()),
-                text_color: Color::WHITE,
-                ..Default::default()
-            });
-
-        let confirm_btn = button(text("确认").color(Color::WHITE))
+        let confirm_btn = button(text(confirm_label).color(Color::WHITE))
             .on_press(on_confirm)
             .style(|_, _| iced::widget::button::Style {
                 background: Some(Color::from_rgb(0.2, 0.6, 0.86).into()),
@@ -43,13 +46,30 @@ impl ModalView {
                 ..Default::default()
             });
 
-        let footer = row![
-            Space::new().width(Length::Fill),
-            cancel_btn,
-            confirm_btn,
-        ]
-        .spacing(12)
-        .padding(16);
+        let footer = if show_cancel {
+            let cancel_btn = button(text("取消").color(Color::WHITE))
+                .on_press(on_cancel)
+                .style(|_, _| iced::widget::button::Style {
+                    background: Some(Color::from_rgb(0.3, 0.3, 0.3).into()),
+                    text_color: Color::WHITE,
+                    ..Default::default()
+                });
+            
+            row![
+                Space::new().width(Length::Fill),
+                cancel_btn,
+                confirm_btn,
+            ]
+            .spacing(12)
+            .padding(16)
+        } else {
+            row![
+                Space::new().width(Length::Fill),
+                confirm_btn,
+            ]
+            .spacing(12)
+            .padding(16)
+        };
 
         let dialog = container(
             column![
