@@ -5,6 +5,7 @@ pub mod urgency_badge;
 pub mod modal;
 pub mod new_todo_form;
 pub mod new_node_modal;
+pub mod link_timer_modal;
 
 pub use tree_view::TreeView;
 pub use card_detail::CardDetail;
@@ -13,3 +14,4 @@ pub use urgency_badge::UrgencyBadge;
 pub use modal::ModalView;
 pub use new_todo_form::NewTodoForm;
 pub use new_node_modal::NewNodeModal;
+pub use link_timer_modal::LinkTimerModal;

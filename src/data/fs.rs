@@ -417,4 +417,47 @@ impl DataFs {
         
         Ok(new_full_path)
     }
+    
+    pub fn save_timer_record(&self, record: &crate::app::timer_tab::TimerRecord) -> Result<()> {
+        let path = self.data_dir.join("timers").join("history.json");
+        let mut records = self.load_timer_history()?;
+        records.push(record.clone());
+        
+        let json = serde_json::to_string_pretty(&records).map_err(|e| DataError::Json(e.to_string()))?;
+        std::fs::write(path, json).map_err(|e| DataError::Io(e.to_string()))?;
+        Ok(())
+    }
+    
+    pub fn load_timer_history(&self) -> Result<Vec<crate::app::timer_tab::TimerRecord>> {
+        let path = self.data_dir.join("timers").join("history.json");
+        if !path.exists() {
+            return Ok(vec![]);
+        }
+        
+        let content = std::fs::read_to_string(path).map_err(|e| DataError::Io(e.to_string()))?;
+        let records: Vec<crate::app::timer_tab::TimerRecord> = serde_json::from_str(&content).map_err(|e| DataError::Json(e.to_string()))?;
+        Ok(records)
+    }
+    
+    pub fn delete_timer_record(&self, id: uuid::Uuid) -> Result<()> {
+        let path = self.data_dir.join("timers").join("history.json");
+        let mut records = self.load_timer_history()?;
+        records.retain(|r| r.id != id);
+        
+        let json = serde_json::to_string_pretty(&records).map_err(|e| DataError::Json(e.to_string()))?;
+        std::fs::write(path, json).map_err(|e| DataError::Io(e.to_string()))?;
+        Ok(())
+    }
+    
+    pub fn update_timer_record(&self, record: &crate::app::timer_tab::TimerRecord) -> Result<()> {
+        let path = self.data_dir.join("timers").join("history.json");
+        let mut records = self.load_timer_history()?;
+        if let Some(idx) = records.iter().position(|r| r.id == record.id) {
+            records[idx] = record.clone();
+        }
+        
+        let json = serde_json::to_string_pretty(&records).map_err(|e| DataError::Json(e.to_string()))?;
+        std::fs::write(path, json).map_err(|e| DataError::Io(e.to_string()))?;
+        Ok(())
+    }
 }

@@ -1,7 +1,7 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, TimeZone};
 use fsrs::{DEFAULT_PARAMETERS, FSRS, MemoryState};
 
-use crate::data::models::MemoryQuality;
+use crate::data::models::{MemoryQuality, ReviewRecord};
 
 pub struct FsrsPredictor {
     engine: FSRS,
@@ -54,15 +54,72 @@ impl FsrsPredictor {
         Ok((interval as i32, new_state))
     }
 
+    pub fn predict_from_records(
+        &self,
+        records: &[ReviewRecord],
+        current_memory_state: Option<MemoryState>,
+        desired_retention: f32,
+    ) -> Result<(DateTime<Utc>, MemoryState), String> {
+        if records.is_empty() {
+            let now = Utc::now();
+            let next_states = self
+                .engine
+                .next_states(None, desired_retention, 0)
+                .map_err(|e| format!("Failed to calculate initial states: {:?}", e))?;
+            
+            return Ok((now, next_states.good.memory));
+        }
+
+        let mut memory_state = current_memory_state;
+        
+        for i in 0..records.len() {
+            let record = &records[i];
+            let days_elapsed = if i == 0 {
+                0
+            } else {
+                let prev_time = records[i - 1].timestamp;
+                ((record.timestamp - prev_time).num_days().max(0) as u32)
+            };
+
+            let next_states = self
+                .engine
+                .next_states(memory_state, desired_retention, days_elapsed)
+                .map_err(|e| format!("Failed to calculate next states: {:?}", e))?;
+
+            memory_state = match record.memory_quality {
+                MemoryQuality::Relearn => Some(next_states.again.memory),
+                MemoryQuality::Hard => Some(next_states.hard.memory),
+                MemoryQuality::Good => Some(next_states.good.memory),
+                MemoryQuality::Easy => Some(next_states.easy.memory),
+            };
+        }
+
+        let last_record = records.last().unwrap();
+        let days_since_last = (Utc::now() - last_record.timestamp).num_days().max(0) as u32;
+        
+        let next_states = self
+            .engine
+            .next_states(memory_state, desired_retention, days_since_last)
+            .map_err(|e| format!("Failed to calculate final states: {:?}", e))?;
+
+        let interval = next_states.good.interval as i64;
+        let next_review = Utc::now() + chrono::Duration::days(interval);
+
+        Ok((next_review, next_states.good.memory))
+    }
+
     pub fn calculate_urgency(next_review: DateTime<Utc>) -> i32 {
         let now = Utc::now();
-        let days_until = (next_review - now).num_days();
-
-        match days_until {
-            d if d < 0 => 3,
-            d if d == 0 => 2,
-            d if d <= 3 => 1,
-            _ => 0,
+        let hours_until = (next_review - now).num_hours();
+        
+        if hours_until < 0 {
+            3
+        } else if hours_until <= 12 {
+            2
+        } else if hours_until <= 72 {
+            1
+        } else {
+            0
         }
     }
 
@@ -131,16 +188,16 @@ mod tests {
         let now = Utc::now();
 
         assert_eq!(
-            FsrsPredictor::calculate_urgency(now - chrono::Duration::days(1)),
+            FsrsPredictor::calculate_urgency(now - chrono::Duration::hours(1)),
             3
         );
-        assert_eq!(FsrsPredictor::calculate_urgency(now), 2);
+        assert_eq!(FsrsPredictor::calculate_urgency(now + chrono::Duration::hours(12)), 2);
         assert_eq!(
-            FsrsPredictor::calculate_urgency(now + chrono::Duration::days(2)),
+            FsrsPredictor::calculate_urgency(now + chrono::Duration::hours(48)),
             1
         );
         assert_eq!(
-            FsrsPredictor::calculate_urgency(now + chrono::Duration::days(7)),
+            FsrsPredictor::calculate_urgency(now + chrono::Duration::hours(100)),
             0
         );
     }

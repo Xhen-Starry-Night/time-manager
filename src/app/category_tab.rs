@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use crate::gui::components::TreeView;
 use crate::gui::components::tree_view::TreeNode;
 use crate::gui::NodeType;
-use crate::data::models::{Card, ReviewRecord, MemoryQuality};
+use crate::data::models::{Card, ReviewRecord, MemoryQuality, Prediction};
 
 #[derive(Debug, Clone)]
 pub struct SearchResult {
@@ -34,15 +34,18 @@ impl NewNodeForm {
 #[derive(Debug, Clone)]
 pub struct EditCardForm {
     pub path: String,
+    pub name: String,
     pub original_name: String,
     pub new_name: String,
     pub preset: String,
-    pub next_review: Option<DateTime<Utc>>,
+    pub next_review: Option<chrono::DateTime<chrono::Utc>>,
     pub clear_prediction: bool,
     pub review_records: Vec<ReviewRecord>,
-    pub expanded_groups: HashSet<String>,
     pub new_review_duration: String,
     pub new_review_quality: MemoryQuality,
+    pub expanded_groups: HashSet<String>,
+    pub fsrs_state_bytes: Vec<u8>,
+    pub prediction: Option<Prediction>,
 }
 
 impl EditCardForm {
@@ -58,6 +61,7 @@ impl EditCardForm {
         
         Self {
             path: path.clone(),
+            name: name.clone(),
             original_name: name.clone(),
             new_name: name,
             preset,
@@ -67,6 +71,10 @@ impl EditCardForm {
             expanded_groups,
             new_review_duration: String::new(),
             new_review_quality: MemoryQuality::Good,
+            fsrs_state_bytes: card.prediction.as_ref()
+                .map(|p| p.fsrs_state_bytes.clone())
+                .unwrap_or_default(),
+            prediction: card.prediction.clone(),
         }
     }
 }

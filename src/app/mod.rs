@@ -382,8 +382,26 @@ impl App {
             
             Message::EditCardPredict => {
                 if let Some(ref mut form) = self.category_tab.edit_card_form {
-                    form.clear_prediction = false;
-                    form.next_review = Some(chrono::Utc::now() + chrono::Duration::days(1));
+                    use crate::fsrs::FsrsPredictor;
+                    
+                    let predictor = FsrsPredictor::new().ok();
+                    if let Some(predictor) = predictor {
+                        let current_state = form.prediction.as_ref()
+                            .and_then(|p| FsrsPredictor::bytes_to_memory_state(&p.fsrs_state_bytes));
+                        
+                        match predictor.predict_from_records(&form.review_records, current_state, 0.9) {
+                            Ok((next_review, new_state)) => {
+                                form.next_review = Some(next_review);
+                                form.fsrs_state_bytes = FsrsPredictor::memory_state_to_bytes(&new_state);
+                                form.clear_prediction = false;
+                            }
+                            Err(_) => {
+                                form.next_review = Some(chrono::Utc::now() + chrono::Duration::days(1));
+                            }
+                        }
+                    } else {
+                        form.next_review = Some(chrono::Utc::now() + chrono::Duration::days(1));
+                    }
                 }
                 Task::none()
             }
@@ -440,23 +458,21 @@ impl App {
             }
             
             Message::EditCardConfirm => {
-                if let Some(ref form) = self.category_tab.edit_card_form {
+                if let Some(ref mut form) = self.category_tab.edit_card_form {
                     let mut card = Card::new();
                     card.review_records = form.review_records.clone();
                     
-                    use crate::data::models::Prediction;
-                    if form.clear_prediction {
-                        card.prediction = None;
-                    } else if let Some(next_review) = form.next_review {
+                    if !form.clear_prediction {
+                        use crate::data::models::Prediction;
                         card.prediction = Some(Prediction {
                             algorithm: "fsrs".to_string(),
-                            next_review,
-                            fsrs_state_bytes: vec![],
+                            next_review: form.next_review.unwrap_or_else(|| chrono::Utc::now()),
+                            fsrs_state_bytes: form.fsrs_state_bytes.clone(),
                             preset_used: form.preset.clone(),
                         });
                     }
                     
-                    let final_path = if form.new_name != form.original_name {
+                    let final_path = if form.original_name != form.new_name {
                         match self.data_fs.rename_card(&form.path, &form.new_name) {
                             Ok(new_path) => new_path,
                             Err(e) => {
@@ -544,6 +560,72 @@ impl App {
                 Task::none()
             }
             
+            Message::ReviewCardSelected(path) => {
+                self.review_tab.selected_card = Some(path);
+                Task::none()
+            }
+            
+            Message::StartReviewTimer(_path) => {
+                self.active_tab = TabId::Timer;
+                let _ = self.timer_manager.start();
+                self.timer_tab.state = self.timer_manager.get_state().clone();
+                Task::none()
+            }
+            
+            Message::RefreshPredictions => {
+                use crate::fsrs::FsrsPredictor;
+                
+                let data_fs = Arc::new(self.data_fs.clone());
+                return Task::future(async move {
+                    let predictor = FsrsPredictor::new().expect("Failed to create FSRS predictor");
+                    let trees = data_fs.list_trees().unwrap_or_default();
+                    let mut all_cards = Vec::new();
+                    for tree in &trees {
+                        let cards = data_fs.list_cards(tree).unwrap_or_default();
+                        all_cards.extend(cards);
+                    }
+                    
+                    for (path, mut card) in all_cards.clone() {
+                        if !card.review_records.is_empty() {
+                            let current_state = card.prediction.as_ref()
+                                .and_then(|p| crate::fsrs::FsrsPredictor::bytes_to_memory_state(&p.fsrs_state_bytes));
+                            
+                            match predictor.predict_from_records(&card.review_records, current_state, 0.9) {
+                                Ok((next_review, new_state)) => {
+                                    use crate::data::models::Prediction;
+                                    card.prediction = Some(Prediction {
+                                        algorithm: "fsrs".to_string(),
+                                        next_review,
+                                        fsrs_state_bytes: crate::fsrs::FsrsPredictor::memory_state_to_bytes(&new_state),
+                                        preset_used: "default".to_string(),
+                                    });
+                                    let _ = data_fs.save_card(&path, &card);
+                                }
+                                Err(e) => {
+                                    eprintln!("Failed to predict for {}: {}", path, e);
+                                }
+                            }
+                        }
+                    }
+                    
+                    let trees = data_fs.list_trees().unwrap_or_default();
+                    let mut all_cards = Vec::new();
+                    for tree in &trees {
+                        let cards = data_fs.list_cards(tree).unwrap_or_default();
+                        all_cards.extend(cards);
+                    }
+                    let presets = data_fs.list_presets().unwrap_or_default();
+                    let todos = data_fs.list_todos().unwrap_or_default();
+                    
+                    Message::DataLoaded(Ok(DataSnapshot {
+                        trees,
+                        cards: all_cards,
+                        presets,
+                        todos,
+                    }))
+                });
+            }
+            
             Message::TimerStarted => {
                 self.timer_manager.start();
                 self.timer_tab.state = self.timer_manager.get_state().clone();
@@ -562,6 +644,12 @@ impl App {
                         self.timer_manager.stop();
                         self.timer_tab.state = self.timer_manager.get_state().clone();
                         self.timer_tab.elapsed_ms = 0;
+                        
+                        // 如果有预设卡片路径，进入链接模式
+                        if let Some(card_path) = self.timer_tab.current_card.take() {
+                            self.timer_tab.link_mode = true;
+                            self.timer_tab.card_path_input = card_path;
+                        }
                     }
                     Err(e) => {
                         self.error_message = Some(e);
@@ -572,6 +660,97 @@ impl App {
             
             Message::TimerTick(_) => {
                 self.timer_tab.elapsed_ms = self.timer_manager.get_state().elapsed_ms();
+                Task::none()
+            }
+            
+            Message::TimerLinkModeOpen => {
+                self.timer_tab.link_mode = true;
+                Task::none()
+            }
+            
+            Message::TimerLinkModeClose => {
+                self.timer_tab.link_mode = false;
+                Task::none()
+            }
+            
+            Message::TimerCardPathChanged(path) => {
+                self.timer_tab.card_path_input = path;
+                Task::none()
+            }
+            
+            Message::TimerCardSelected(path) => {
+                self.timer_tab.selected_card = Some(path);
+                Task::none()
+            }
+            
+            Message::TimerMemoryQualityChanged(quality) => {
+                self.timer_tab.memory_quality = quality;
+                Task::none()
+            }
+            
+            Message::TimerLinkConfirm => {
+                if let Some(card_path) = &self.timer_tab.selected_card {
+                    let duration_ms = self.timer_tab.elapsed_ms;
+                    let quality = self.timer_tab.memory_quality.clone();
+                    
+                    // 创建 ReviewRecord
+                    let record = crate::data::models::ReviewRecord {
+                        timestamp: chrono::Utc::now(),
+                        duration_ms,
+                        memory_quality: quality.clone(),
+                    };
+                    
+                    // 保存到卡片
+                    if let Ok(mut card) = self.data_fs.get_card(card_path) {
+                        card.review_records.push(record);
+                        
+                        // 触发 FSRS 预测
+                        if let Ok(predictor) = crate::fsrs::FsrsPredictor::new() {
+                            if let Ok((next_review, new_state)) = predictor.predict_from_records(
+                                &card.review_records,
+                                None,
+                                0.9
+                            ) {
+                                card.prediction = Some(crate::data::models::Prediction {
+                                    algorithm: "fsrs".to_string(),
+                                    next_review,
+                                    fsrs_state_bytes: crate::fsrs::FsrsPredictor::memory_state_to_bytes(&new_state),
+                                    preset_used: "default".to_string(),
+                                });
+                            }
+                        }
+                        
+                        let _ = self.data_fs.save_card(card_path, &card);
+                    }
+                    
+                    self.timer_tab.link_mode = false;
+                }
+                Task::none()
+            }
+            
+            Message::TimerCreateNewCard => {
+                // 创建新卡片逻辑
+                Task::none()
+            }
+            
+            Message::TimerHistoryShow => {
+                self.timer_tab.show_history = true;
+                Task::none()
+            }
+            
+            Message::TimerHistoryHide => {
+                self.timer_tab.show_history = false;
+                Task::none()
+            }
+            
+            Message::QuickTimerStart(path) => {
+                self.timer_tab.current_card = Some(path);
+                self.active_tab = TabId::Timer;
+                
+                // 自动开始计时
+                self.timer_manager.start();
+                self.timer_tab.state = self.timer_manager.get_state().clone();
+                
                 Task::none()
             }
             
@@ -992,6 +1171,14 @@ impl App {
                                     Space::new().height(12),
                                     card_action_buttons(path),
                                     Space::new().height(12),
+                                    button(text("开始计时").color(iced::Color::WHITE))
+                                        .on_press(Message::QuickTimerStart(path.to_string()))
+                                        .style(|_, _| iced::widget::button::Style {
+                                            background: Some(iced::Color::from_rgb(0.3, 0.6, 0.4).into()),
+                                            text_color: iced::Color::WHITE,
+                                            ..Default::default()
+                                        }),
+                                    Space::new().height(12),
                                     rule::horizontal(1.0),
                                     Space::new().height(12),
                                     crate::gui::components::CardDetail::view(path, card)
@@ -1061,17 +1248,24 @@ impl App {
             }
             TabId::Review => {
                 use crate::fsrs::FsrsPredictor;
+                use review_tab::CardStats;
                 
-                let cards_with_urgency: Vec<(String, i32, &Card)> = self.review_tab.cards.iter()
+                let cards_with_urgency: Vec<(String, i32, Card)> = self.review_tab.cards.iter()
                     .filter_map(|(path, card)| {
                         card.prediction.as_ref().map(|pred| {
                             let urgency = FsrsPredictor::calculate_urgency(pred.next_review);
-                            (path.clone(), urgency, card)
+                            (path.clone(), urgency, card.clone())
                         })
                     })
                     .filter(|(_, urgency, _)| {
-                        self.review_tab.urgency_filter
-                            .map_or(true, |filter| *urgency as u32 == filter)
+                        self.review_tab.urgency_filter.map_or(true, |filter| {
+                            match filter {
+                                3 => *urgency >= 3,
+                                2 => *urgency >= 2,
+                                1 => *urgency >= 1,
+                                _ => true,
+                            }
+                        })
                     })
                     .collect();
                 
@@ -1079,13 +1273,19 @@ impl App {
                     filter_button("全部", None, self.review_tab.urgency_filter),
                     filter_button("已过期", Some(3), self.review_tab.urgency_filter),
                     filter_button("今日", Some(2), self.review_tab.urgency_filter),
-                    filter_button("近期", Some(1), self.review_tab.urgency_filter),
-                    filter_button("稍后", Some(0), self.review_tab.urgency_filter),
+                    filter_button("本周", Some(1), self.review_tab.urgency_filter),
+                    button(text("重新预测").color(iced::Color::WHITE))
+                        .on_press(Message::RefreshPredictions)
+                        .style(|_, _| iced::widget::button::Style {
+                            background: Some(iced::Color::from_rgb(0.3, 0.5, 0.7).into()),
+                            text_color: iced::Color::WHITE,
+                            ..Default::default()
+                        }),
                 ]
                 .spacing(8)
                 .padding(8);
                 
-                let card_list = if cards_with_urgency.is_empty() {
+                let card_list: Element<Message> = if cards_with_urgency.is_empty() {
                     container(
                         text("暂无需要复习的卡片")
                             .size(16)
@@ -1095,136 +1295,180 @@ impl App {
                     .height(Length::Fill)
                     .center_x(Length::Fill)
                     .center_y(Length::Fill)
+                    .into()
                 } else {
-                    container(
-                        scrollable(
-                            column(
-                                cards_with_urgency.iter().map(|(path, urgency, _)| {
-                                    row![
-                                        container(
-                                            crate::gui::components::UrgencyBadge::view(*urgency as u32)
-                                                .map(|_| Message::ClearError)
-                                        ),
-                                        text(path.clone()).color(iced::Color::WHITE),
-                                    ]
-                                    .spacing(12)
-                                    .padding(8)
-                                    .width(Length::Fill)
-                                    .into()
-                                })
-                            )
-                            .spacing(4)
+                    scrollable(
+                        column(
+                            cards_with_urgency.iter().map(|(path, urgency, _)| {
+                                let is_selected = self.review_tab.selected_card.as_ref() == Some(path);
+                                let card_name = path.split('/').next_back().unwrap_or(path);
+                                review_card_item(card_name.to_string(), path.clone(), *urgency, is_selected)
+                            })
                         )
+                        .spacing(4)
                     )
-                    .width(Length::Fill)
-                    .height(Length::Fill)
+                    .into()
                 };
                 
-                container(
-                    column![filter_buttons, rule::horizontal(1.0), card_list]
-                        .width(Length::Fill)
+                let left_panel = container(card_list)
+                    .width(Length::FillPortion(2))
+                    .height(Length::Fill)
+                    .padding(8);
+                
+                let right_panel: Element<Message> = if let Some(ref selected_path) = self.review_tab.selected_card {
+                    if let Some((_, _, card)) = cards_with_urgency.iter()
+                        .find(|(path, _, _)| path == selected_path) 
+                    {
+                        let stats = CardStats::from_card(card);
+                        review_detail_panel(selected_path, card, &stats)
+                    } else {
+                        container(
+                            text("选择卡片查看详情")
+                                .size(16)
+                                .color(iced::Color::from_rgb(0.6, 0.6, 0.6))
+                        )
+                        .width(Length::FillPortion(3))
                         .height(Length::Fill)
-                )
+                        .center_x(Length::Fill)
+                        .center_y(Length::Fill)
+                        .into()
+                    }
+                } else {
+                    container(
+                        text("选择卡片查看详情")
+                            .size(16)
+                            .color(iced::Color::from_rgb(0.6, 0.6, 0.6))
+                    )
+                    .width(Length::FillPortion(3))
+                    .height(Length::Fill)
+                    .center_x(Length::Fill)
+                    .center_y(Length::Fill)
+                    .into()
+                };
+                
+                let content = column![
+                    filter_buttons,
+                    rule::horizontal(1.0),
+                    row![left_panel, right_panel]
+                        .spacing(1)
+                        .width(Length::Fill)
+                        .height(Length::Fill),
+                ]
                 .width(Length::Fill)
-                .height(Length::Fill)
-                .style(|_: &iced::Theme| iced::widget::container::Style {
-                    background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
-                    ..Default::default()
-                })
-                .into()
+                .height(Length::Fill);
+                
+                container(content)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .style(|_: &iced::Theme| iced::widget::container::Style {
+                        background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
+                        ..Default::default()
+                    })
+                    .into()
             }
             TabId::Timer => {
                 use crate::timer::TimerState;
                 use crate::gui::components::TimerDisplay;
                 
-                let timer_display = TimerDisplay::view(&self.timer_tab.state, self.timer_tab.elapsed_ms)
-                    .map(|_| Message::ClearError);
-                
-                let (start_btn, pause_btn, stop_btn) = match &self.timer_tab.state {
-                    TimerState::Idle => {
-                        (
-                            button(text("开始").color(iced::Color::WHITE))
-                                .on_press(Message::TimerStarted)
-                                .style(|_, _| iced::widget::button::Style {
-                                    background: Some(iced::Color::from_rgb(0.2, 0.7, 0.4).into()),
-                                    text_color: iced::Color::WHITE,
-                                    ..Default::default()
-                                }),
-                            button(text("暂停").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
-                            button(text("停止").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
-                        )
-                    }
-                    TimerState::Running { .. } => {
-                        (
-                            button(text("开始").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
-                            button(text("暂停").color(iced::Color::WHITE))
-                                .on_press(Message::TimerPaused)
-                                .style(|_, _| iced::widget::button::Style {
-                                    background: Some(iced::Color::from_rgb(0.95, 0.61, 0.07).into()),
-                                    text_color: iced::Color::WHITE,
-                                    ..Default::default()
-                                }),
-                            button(text("停止").color(iced::Color::WHITE))
-                                .on_press(Message::TimerStopped(Ok(std::path::PathBuf::new())))
-                                .style(|_, _| iced::widget::button::Style {
-                                    background: Some(iced::Color::from_rgb(0.91, 0.30, 0.24).into()),
-                                    text_color: iced::Color::WHITE,
-                                    ..Default::default()
-                                }),
-                        )
-                    }
-                    TimerState::Paused { .. } => {
-                        (
-                            button(text("开始").color(iced::Color::WHITE))
-                                .on_press(Message::TimerStarted)
-                                .style(|_, _| iced::widget::button::Style {
-                                    background: Some(iced::Color::from_rgb(0.2, 0.7, 0.4).into()),
-                                    text_color: iced::Color::WHITE,
-                                    ..Default::default()
-                                }),
-                            button(text("暂停").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
-                            button(text("停止").color(iced::Color::WHITE))
-                                .on_press(Message::TimerStopped(Ok(std::path::PathBuf::new())))
-                                .style(|_, _| iced::widget::button::Style {
-                                    background: Some(iced::Color::from_rgb(0.91, 0.30, 0.24).into()),
-                                    text_color: iced::Color::WHITE,
-                                    ..Default::default()
-                                }),
-                        )
-                    }
-                    TimerState::Stopped { .. } => {
-                        (
-                            button(text("开始").color(iced::Color::WHITE))
-                                .on_press(Message::TimerStarted)
-                                .style(|_, _| iced::widget::button::Style {
-                                    background: Some(iced::Color::from_rgb(0.2, 0.7, 0.4).into()),
-                                    text_color: iced::Color::WHITE,
-                                    ..Default::default()
-                                }),
-                            button(text("暂停").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
-                            button(text("停止").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
-                        )
-                    }
-                };
-                
-                let controls = row![start_btn, pause_btn, stop_btn]
-                    .spacing(16)
-                    .padding(16);
-                
-                container(
-                    column![timer_display, controls]
-                        .spacing(32)
-                        .align_x(iced::Alignment::Center)
-                )
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .center_x(Length::Fill)
-                .center_y(Length::Fill)
-                .style(|_: &iced::Theme| iced::widget::container::Style {
-                    background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
-                    ..Default::default()
-                })
-                .into()
+                if self.timer_tab.link_mode {
+                    // 链接模态框模式 - 使用独立的视图函数避免生命周期问题
+                    let duration_ms = self.timer_tab.elapsed_ms;
+                    let card_path = self.timer_tab.card_path_input.clone();
+                    let card_dropdown = self.timer_tab.card_dropdown.clone();
+                    let selected_card = self.timer_tab.selected_card.clone();
+                    let memory_quality = self.timer_tab.memory_quality.clone();
+                    
+                    view_link_timer_modal(duration_ms, card_path, card_dropdown, selected_card, memory_quality)
+                } else {
+                    let timer_display = TimerDisplay::view(&self.timer_tab.state, self.timer_tab.elapsed_ms, self.timer_tab.current_card.as_deref())
+                        .map(|_| Message::ClearError);
+                    
+                    let (start_btn, pause_btn, stop_btn) = match &self.timer_tab.state {
+                        TimerState::Idle => {
+                            (
+                                button(text("开始").color(iced::Color::WHITE))
+                                    .on_press(Message::TimerStarted)
+                                    .style(|_, _| iced::widget::button::Style {
+                                        background: Some(iced::Color::from_rgb(0.2, 0.7, 0.4).into()),
+                                        text_color: iced::Color::WHITE,
+                                        ..Default::default()
+                                    }),
+                                button(text("暂停").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
+                                button(text("停止").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
+                            )
+                        }
+                        TimerState::Running { .. } => {
+                            (
+                                button(text("开始").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
+                                button(text("暂停").color(iced::Color::WHITE))
+                                    .on_press(Message::TimerPaused)
+                                    .style(|_, _| iced::widget::button::Style {
+                                        background: Some(iced::Color::from_rgb(0.95, 0.61, 0.07).into()),
+                                        text_color: iced::Color::WHITE,
+                                        ..Default::default()
+                                    }),
+                                button(text("停止").color(iced::Color::WHITE))
+                                    .on_press(Message::TimerStopped(Ok(std::path::PathBuf::new())))
+                                    .style(|_, _| iced::widget::button::Style {
+                                        background: Some(iced::Color::from_rgb(0.91, 0.30, 0.24).into()),
+                                        text_color: iced::Color::WHITE,
+                                        ..Default::default()
+                                    }),
+                            )
+                        }
+                        TimerState::Paused { .. } => {
+                            (
+                                button(text("开始").color(iced::Color::WHITE))
+                                    .on_press(Message::TimerStarted)
+                                    .style(|_, _| iced::widget::button::Style {
+                                        background: Some(iced::Color::from_rgb(0.2, 0.7, 0.4).into()),
+                                        text_color: iced::Color::WHITE,
+                                        ..Default::default()
+                                    }),
+                                button(text("暂停").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
+                                button(text("停止").color(iced::Color::WHITE))
+                                    .on_press(Message::TimerStopped(Ok(std::path::PathBuf::new())))
+                                    .style(|_, _| iced::widget::button::Style {
+                                        background: Some(iced::Color::from_rgb(0.91, 0.30, 0.24).into()),
+                                        text_color: iced::Color::WHITE,
+                                        ..Default::default()
+                                    }),
+                            )
+                        }
+                        TimerState::Stopped { .. } => {
+                            (
+                                button(text("开始").color(iced::Color::WHITE))
+                                    .on_press(Message::TimerStarted)
+                                    .style(|_, _| iced::widget::button::Style {
+                                        background: Some(iced::Color::from_rgb(0.2, 0.7, 0.4).into()),
+                                        text_color: iced::Color::WHITE,
+                                        ..Default::default()
+                                    }),
+                                button(text("暂停").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
+                                button(text("停止").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
+                            )
+                        }
+                    };
+                    
+                    let controls = row![start_btn, pause_btn, stop_btn]
+                        .spacing(16)
+                        .padding(16);
+                    
+                    container(
+                        column![timer_display, controls]
+                            .spacing(32)
+                            .align_x(iced::Alignment::Center)
+                    )
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .center_x(Length::Fill)
+                    .center_y(Length::Fill)
+                    .style(|_: &iced::Theme| iced::widget::container::Style {
+                        background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
+                        ..Default::default()
+                    })
+                    .into()
+                }
             }
             TabId::Todo => {
                 let add_button = button(text("添加待办").color(iced::Color::WHITE))
@@ -1861,5 +2105,251 @@ fn filter_button(label: &str, filter: Option<u32>, current: Option<u32>) -> Elem
             ..Default::default()
         })
     }
+    .into()
+}
+
+fn review_card_item(card_name: String, path: String, urgency: i32, is_selected: bool) -> Element<'static, Message> {
+    let (urgency_text, urgency_color) = match urgency {
+        3 => ("已过期", iced::Color::from_rgb(0.9, 0.3, 0.2)),
+        2 => ("今日", iced::Color::from_rgb(0.9, 0.7, 0.2)),
+        1 => ("本周", iced::Color::from_rgb(0.3, 0.7, 0.4)),
+        _ => ("稍后", iced::Color::from_rgb(0.5, 0.5, 0.5)),
+    };
+    
+    button(
+        column![
+            text(card_name).color(iced::Color::WHITE).size(13),
+            text(urgency_text).color(urgency_color).size(11),
+        ]
+        .spacing(2)
+    )
+    .on_press(Message::ReviewCardSelected(path))
+    .style(move |_, _| {
+        if is_selected {
+            iced::widget::button::Style {
+                background: Some(iced::Color::from_rgb(0.3, 0.5, 0.6).into()),
+                text_color: iced::Color::WHITE,
+                ..Default::default()
+            }
+        } else {
+            iced::widget::button::Style {
+                background: Some(iced::Color::from_rgb(0.25, 0.25, 0.25).into()),
+                text_color: iced::Color::WHITE,
+                ..Default::default()
+            }
+        }
+    })
+    .width(Length::Fill)
+    .into()
+}
+
+fn view_link_timer_modal(
+    duration_ms: i64,
+    card_path: String,
+    card_dropdown: Vec<String>,
+    selected_card: Option<String>,
+    memory_quality: crate::data::models::MemoryQuality,
+) -> Element<'static, Message> {
+    use iced::widget::{button, column, row, text, container, text_input, pick_list, Space};
+    use iced::{Length, Color};
+    
+    let seconds = duration_ms / 1000;
+    let minutes = seconds / 60;
+    let hours = minutes / 60;
+    
+    let duration_text = if hours > 0 {
+        format!("{}小时 {}分钟 {}秒", hours, minutes % 60, seconds % 60)
+    } else if minutes > 0 {
+        format!("{}分钟 {}秒", minutes, seconds % 60)
+    } else {
+        format!("{}秒", seconds)
+    };
+    
+    container(
+        column![
+            text("计时完成").size(20).color(Color::WHITE),
+            
+            text(format!("学习时长: {}", duration_text))
+                .size(16)
+                .color(Color::WHITE),
+            
+            Space::new().height(16),
+            
+            // 卡片路径输入（手动输入）
+            row![
+                text("关联到卡片:").color(Color::WHITE),
+                text_input("输入卡片路径...", &card_path)
+                    .on_input(Message::TimerCardPathChanged),
+            ],
+            
+            // 或下拉选择
+            row![
+                text("或选择:").color(Color::WHITE),
+                pick_list(
+                    card_dropdown.clone(),
+                    selected_card.clone(),
+                    Message::TimerCardSelected,
+                ),
+            ],
+            
+            // 或创建新卡片
+            button(text("创建新卡片..."))
+                .on_press(Message::TimerCreateNewCard),
+            
+            Space::new().height(16),
+            
+            // 记忆质量选择
+            row![
+                text("记忆质量:").color(Color::WHITE),
+                MemoryQualitySelector::view(&memory_quality),
+            ],
+            
+            Space::new().height(24),
+            
+            // 按钮
+            row![
+                button(text("取消"))
+                    .on_press(Message::TimerLinkModeClose),
+                button(text("保存并预测"))
+                    .on_press(Message::TimerLinkConfirm),
+            ]
+            .spacing(12),
+        ]
+        .spacing(8)
+    )
+    .padding(24)
+    .style(|_| container::Style {
+        background: Some(Color::from_rgb(0.2, 0.2, 0.2).into()),
+        ..Default::default()
+    })
+    .into()
+}
+
+struct MemoryQualitySelector;
+
+impl MemoryQualitySelector {
+    fn view(quality: &crate::data::models::MemoryQuality) -> Element<'static, Message> {
+        use iced::widget::{button, row, text};
+        use iced::Color;
+        
+        row![
+            quality_button("重学", crate::data::models::MemoryQuality::Relearn, quality),
+            quality_button("困难", crate::data::models::MemoryQuality::Hard, quality),
+            quality_button("好", crate::data::models::MemoryQuality::Good, quality),
+            quality_button("简单", crate::data::models::MemoryQuality::Easy, quality),
+        ]
+        .spacing(8)
+        .into()
+    }
+}
+
+fn quality_button(label: &'static str, quality: crate::data::models::MemoryQuality, current: &crate::data::models::MemoryQuality) -> Element<'static, Message> {
+    use iced::widget::{button, text};
+    use iced::Color;
+    
+    let is_selected = *current == quality;
+    
+    button(text(label).color(Color::WHITE))
+        .on_press(Message::TimerMemoryQualityChanged(quality))
+        .style(move |_, _| {
+            if is_selected {
+                iced::widget::button::Style {
+                    background: Some(Color::from_rgb(0.2, 0.6, 0.86).into()),
+                    text_color: Color::WHITE,
+                    ..Default::default()
+                }
+            } else {
+                iced::widget::button::Style {
+                    background: Some(Color::from_rgb(0.3, 0.3, 0.3).into()),
+                    text_color: Color::WHITE,
+                    ..Default::default()
+                }
+            }
+        })
+        .into()
+}
+fn review_detail_panel(path: &str, card: &Card, stats: &review_tab::CardStats) -> Element<'static, Message> {
+    let path_display = path.split('/')
+        .collect::<Vec<_>>()
+        .join(" > ");
+    
+    let total_min = stats.total_duration_ms / 60000;
+    let total_hours = total_min / 60;
+    let total_mins = total_min % 60;
+    let avg_min = stats.avg_duration_ms / 60000;
+    
+    let last_review = stats.last_review
+        .map(|d| d.format("%Y-%m-%d").to_string())
+        .unwrap_or_else(|| "无".to_string());
+    
+    let next_review = stats.next_review
+        .map(|d| d.format("%Y-%m-%d").to_string())
+        .unwrap_or_else(|| "未预测".to_string());
+    
+    let path_str = path.to_string();
+    container(
+        column![
+            text(path_display).color(iced::Color::from_rgb(0.7, 0.7, 0.7)).size(12),
+            Space::new().height(16),
+            
+            row![
+                text("会话: ").color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                text(format!("{} 次", stats.sessions)).color(iced::Color::WHITE),
+            ],
+            row![
+                text("时长: ").color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                text(format!("{}h {}m", total_hours, total_mins)).color(iced::Color::WHITE),
+            ],
+            row![
+                text("平均: ").color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                text(format!("{} 分钟", avg_min)).color(iced::Color::WHITE),
+            ],
+            Space::new().height(8),
+            
+            row![
+                text("上次: ").color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                text(last_review).color(iced::Color::WHITE),
+            ],
+            row![
+                text("下次: ").color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                text(next_review).color(iced::Color::WHITE),
+            ],
+            Space::new().height(24),
+            
+            row![
+                button(text("开始计时").color(iced::Color::WHITE))
+                    .on_press(Message::StartReviewTimer(path_str.clone()))
+                    .style(|_, _| iced::widget::button::Style {
+                        background: Some(iced::Color::from_rgb(0.3, 0.6, 0.4).into()),
+                        text_color: iced::Color::WHITE,
+                        border: iced::Border {
+                            radius: 4.0.into(),
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    }),
+                button(text("编辑").color(iced::Color::WHITE))
+                    .on_press(Message::EditCardOpen(path_str))
+                    .style(|_, _| iced::widget::button::Style {
+                        background: Some(iced::Color::from_rgb(0.4, 0.4, 0.5).into()),
+                        text_color: iced::Color::WHITE,
+                        border: iced::Border {
+                            radius: 4.0.into(),
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    }),
+            ]
+            .spacing(12),
+        ]
+        .spacing(4)
+    )
+    .width(Length::Fill)
+    .height(Length::Fill)
+    .padding(16)
+    .style(|_| iced::widget::container::Style {
+        background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
+        ..Default::default()
+    })
     .into()
 }

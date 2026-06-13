@@ -25,6 +25,24 @@ pub enum Message {
     TimerStopped(Result<PathBuf, String>),
     TimerTick(i64),
     
+    TimerLinkModeOpen,
+    TimerLinkModeClose,
+    TimerCardPathChanged(String),
+    TimerCardSelected(String),
+    TimerMemoryQualityChanged(MemoryQuality),
+    TimerLinkConfirm,
+    TimerCreateNewCard,
+    
+    TimerHistoryLoad,
+    TimerHistoryLoaded(Vec<crate::app::timer_tab::TimerRecord>),
+    TimerHistoryEdit(Uuid),
+    TimerHistoryDelete(Uuid),
+    TimerHistoryUpdate(crate::app::timer_tab::TimerRecord),
+    TimerHistoryShow,
+    TimerHistoryHide,
+    
+    QuickTimerStart(String),
+    
     CategorySelected(String),
     CardSelected(String),
     SearchChanged(String),
@@ -74,6 +92,10 @@ pub enum Message {
     
     DeleteNodeOpen(String, bool),
     DeleteNodeConfirm,
+    
+    ReviewCardSelected(String),
+    StartReviewTimer(String),
+    RefreshPredictions,
     
     Error(String),
     ClearError,
