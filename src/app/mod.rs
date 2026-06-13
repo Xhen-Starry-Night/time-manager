@@ -374,10 +374,16 @@ impl App {
             
             Message::EditCardClearPrediction => {
                 if let Some(ref mut form) = self.category_tab.edit_card_form {
-                    form.clear_prediction = !form.clear_prediction;
-                    if form.clear_prediction {
-                        form.next_review = None;
-                    }
+                    form.clear_prediction = true;
+                    form.next_review = None;
+                }
+                Task::none()
+            }
+            
+            Message::EditCardPredict => {
+                if let Some(ref mut form) = self.category_tab.edit_card_form {
+                    form.clear_prediction = false;
+                    form.next_review = Some(chrono::Utc::now() + chrono::Duration::days(1));
                 }
                 Task::none()
             }
@@ -1614,15 +1620,9 @@ impl App {
 }
 
 fn simple_edit_card_view(form: &category_tab::EditCardForm, presets: &[String]) -> Element<'static, Message> {
-    use crate::gui::components::NewNodeModal;
-    
     let presets_owned = presets.to_vec();
     let new_name = form.new_name.clone();
     let preset = form.preset.clone();
-    
-    let next_review_str = form.next_review
-        .map(|d| d.format("%Y-%m-%d").to_string())
-        .unwrap_or_default();
     
     let review_list: Element<Message> = if form.review_records.is_empty() {
         text("暂无复习记录").color(iced::Color::from_rgb(0.6, 0.6, 0.6)).into()
@@ -1669,15 +1669,28 @@ fn simple_edit_card_view(form: &category_tab::EditCardForm, presets: &[String]) 
             .width(Length::Fill),
         Space::new().height(12),
         
-        text("下次复习 (YYYY-MM-DD):").color(iced::Color::WHITE),
+        text("下次复习:").color(iced::Color::WHITE),
         row![
-            text_input("下次复习", &next_review_str)
-                .on_input(Message::EditCardNextReviewChanged)
-                .width(Length::Fixed(150.0)),
+            if let Some(next) = form.next_review {
+                text(next.format("%Y-%m-%d").to_string()).color(iced::Color::from_rgb(0.5, 0.8, 0.5))
+            } else {
+                text("未设置").color(iced::Color::from_rgb(0.6, 0.6, 0.6))
+            },
             button(text("清除").color(iced::Color::WHITE).size(12))
                 .on_press(Message::EditCardClearPrediction)
                 .style(|_, _| iced::widget::button::Style {
                     background: Some(iced::Color::from_rgb(0.5, 0.3, 0.3).into()),
+                    text_color: iced::Color::WHITE,
+                    border: iced::Border {
+                        radius: 4.0.into(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }),
+            button(text("预测").color(iced::Color::WHITE).size(12))
+                .on_press(Message::EditCardPredict)
+                .style(|_, _| iced::widget::button::Style {
+                    background: Some(iced::Color::from_rgb(0.3, 0.5, 0.7).into()),
                     text_color: iced::Color::WHITE,
                     border: iced::Border {
                         radius: 4.0.into(),
@@ -1706,12 +1719,11 @@ fn simple_edit_card_view(form: &category_tab::EditCardForm, presets: &[String]) 
                         .unwrap_or(crate::data::models::MemoryQuality::Good);
                     Message::EditCardNewReviewQualityChanged(quality)
                 }
-            )
-            .width(Length::Fixed(80.0)),
-            button(text("添加").color(iced::Color::WHITE))
+            ),
+            button(text("添加").color(iced::Color::WHITE).size(12))
                 .on_press(Message::EditCardAddReview)
                 .style(|_, _| iced::widget::button::Style {
-                    background: Some(iced::Color::from_rgb(0.3, 0.5, 0.4).into()),
+                    background: Some(iced::Color::from_rgb(0.3, 0.5, 0.7).into()),
                     text_color: iced::Color::WHITE,
                     border: iced::Border {
                         radius: 4.0.into(),

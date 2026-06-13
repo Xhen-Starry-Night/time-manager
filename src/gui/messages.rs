@@ -64,6 +64,7 @@ pub enum Message {
     EditCardPresetChanged(String),
     EditCardNextReviewChanged(String),
     EditCardClearPrediction,
+    EditCardPredict,
     EditCardToggleGroup(String),
     EditCardAddReview,
     EditCardRemoveReview(usize),
