@@ -269,6 +269,66 @@ pub struct Todo {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecurrenceRule {
+    None,
+    Daily,
+    Weekly,
+    Monthly,
+}
+
+impl RecurrenceRule {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::None => "无",
+            Self::Daily => "每天",
+            Self::Weekly => "每周",
+            Self::Monthly => "每月",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "每天" => Self::Daily,
+            "每周" => Self::Weekly,
+            "每月" => Self::Monthly,
+            _ => Self::None,
+        }
+    }
+
+    pub fn to_rrule(&self) -> Option<&'static str> {
+        match self {
+            Self::None => None,
+            Self::Daily => Some("FREQ=DAILY"),
+            Self::Weekly => Some("FREQ=WEEKLY"),
+            Self::Monthly => Some("FREQ=MONTHLY"),
+        }
+    }
+
+    pub fn from_rrule(s: &str) -> Self {
+        match s {
+            "FREQ=DAILY" => Self::Daily,
+            "FREQ=WEEKLY" => Self::Weekly,
+            "FREQ=MONTHLY" => Self::Monthly,
+            _ => Self::None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Schedule {
+    pub id: Uuid,
+    pub summary: String,
+    pub dtstart: DateTime<Utc>,
+    pub dtend: DateTime<Utc>,
+    pub description: Option<String>,
+    pub location: Option<String>,
+    pub categories: Vec<String>,
+    pub priority: Option<i32>,
+    pub rrule: RecurrenceRule,
+    pub reminder_minutes: Option<i32>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub default_preset: String,
