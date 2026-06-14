@@ -746,7 +746,7 @@ impl App {
             }
             
             Message::TimerCreateNewCard => {
-                self.timer_tab.show_new_card_form = true;
+                // 新卡片表单现在常态显示，此消息不再需要
                 Task::none()
             }
             
@@ -774,7 +774,6 @@ impl App {
                     let card = Card::new_with_preset(preset);
                     if let Ok(()) = self.data_fs.save_card(&new_path, &card) {
                         self.timer_tab.card_path_input = new_path;
-                        self.timer_tab.show_new_card_form = false;
                         self.timer_tab.new_card_name.clear();
                     }
                 }
@@ -1422,10 +1421,8 @@ impl App {
                     // 链接模态框模式 - 直接在 App::view 中构建，避免生命周期问题
                     let duration_ms = self.timer_tab.elapsed_ms;
                     let card_path = self.timer_tab.card_path_input.clone();
-                    let card_dropdown = self.timer_tab.card_dropdown.clone();
                     let selected_card = self.timer_tab.selected_card.clone();
                     let memory_quality = self.timer_tab.memory_quality.clone();
-                    let show_new_card_form = self.timer_tab.show_new_card_form;
                     let new_card_name = self.timer_tab.new_card_name.clone();
                     let new_card_preset = self.timer_tab.new_card_preset.clone();
                     let tree_nodes = &self.category_tab.tree_nodes;
