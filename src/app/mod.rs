@@ -261,8 +261,22 @@ impl App {
                 Task::none()
             }
 
-            Message::PresetFormMatchRulesChanged(val) => {
-                self.preset_tab.form_match_rules = val;
+            Message::PresetFormMatchRuleAdded => {
+                self.preset_tab.form_match_rules.push(String::new());
+                Task::none()
+            }
+
+            Message::PresetFormMatchRuleChanged(index, val) => {
+                if index < self.preset_tab.form_match_rules.len() {
+                    self.preset_tab.form_match_rules[index] = val;
+                }
+                Task::none()
+            }
+
+            Message::PresetFormMatchRuleRemoved(index) => {
+                if index < self.preset_tab.form_match_rules.len() {
+                    self.preset_tab.form_match_rules.remove(index);
+                }
                 Task::none()
             }
 
@@ -2119,15 +2133,37 @@ impl App {
                         .on_input(Message::PresetFormNameChanged);
                     let desc_input = text_input("描述（可选）", &self.preset_tab.form_description)
                         .on_input(Message::PresetFormDescriptionChanged);
-                    let rules_input = text_input("匹配规则（一行一条）", &self.preset_tab.form_match_rules)
-                        .on_input(Message::PresetFormMatchRulesChanged);
+                    let rules_label = row![
+                        text("匹配规则").color(iced::Color::WHITE),
+                        iced::widget::Space::new().width(Length::Fill),
+                        button(text("+ 添加规则").size(12))
+                            .style(iced::widget::button::text)
+                            .on_press(Message::PresetFormMatchRuleAdded),
+                    ];
+
+                    let rule_inputs: Vec<iced::Element<'_, Message, iced::Theme>> = self.preset_tab.form_match_rules.iter().enumerate().map(|(i, rule)| {
+                        row![
+                            iced::widget::text_input("例如: main/english/**", rule.as_str())
+                                .on_input(move |val| Message::PresetFormMatchRuleChanged(i, val)),
+                            iced::widget::button(iced::widget::text("×").size(12))
+                                .style(iced::widget::button::text)
+                                .on_press(Message::PresetFormMatchRuleRemoved(i)),
+                        ]
+                        .spacing(4)
+                        .into()
+                    }).collect();
 
                     let mut form_col = column![
                         text(title).size(16).color(iced::Color::WHITE),
                         name_input,
                         desc_input,
-                        rules_input,
-                    ];
+                        rules_label,
+                    ]
+                    .spacing(8);
+
+                    for rule_el in rule_inputs {
+                        form_col = form_col.push(rule_el);
+                    }
 
                     if let Some(ref err) = self.preset_tab.form_error {
                         form_col = form_col.push(text(err.clone()).color(iced::Color::from_rgb(1.0, 0.3, 0.3)));

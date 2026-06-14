@@ -10,7 +10,7 @@ pub struct PresetTabState {
     pub editing_name: Option<String>,
     pub form_name: String,
     pub form_description: String,
-    pub form_match_rules: String,
+    pub form_match_rules: Vec<String>,
     pub form_error: Option<String>,
 
     // delete confirm
@@ -30,7 +30,7 @@ impl PresetTabState {
         if let Some(preset) = self.presets.iter().find(|p| p.name == name) {
             self.form_name = preset.name.clone();
             self.form_description = preset.description.clone().unwrap_or_default();
-            self.form_match_rules = preset.match_rules.join("\n");
+            self.form_match_rules = preset.match_rules.clone();
             self.editing_name = Some(preset.name.clone());
             self.form_error = None;
         }
@@ -41,7 +41,6 @@ impl PresetTabState {
         if name.is_empty() {
             return Err("名称不能为空".into());
         }
-        // check duplicate name
         let duplicate = self.presets.iter().any(|p| {
             if let Some(ref editing) = self.editing_name {
                 p.name == name && p.name != *editing
@@ -61,9 +60,9 @@ impl PresetTabState {
 
         let match_rules: Vec<String> = self
             .form_match_rules
-            .lines()
-            .map(|l| l.trim().to_string())
-            .filter(|l| !l.is_empty())
+            .iter()
+            .map(|r| r.trim().to_string())
+            .filter(|r| !r.is_empty())
             .collect();
 
         Ok(Preset {
