@@ -1246,12 +1246,11 @@ impl App {
                                                 &rules,
                                             ) {
                                                 Ok(result) => {
-                                                    self.settings_tab.message = Some(
-                                                        format!("导入完成: 创建 {} 个目录, 跳过 {} 个路径",
+                                                    self.modal = Some(Modal::Info {
+                                                        message: format!("导入完成: 创建 {} 个目录, 跳过 {} 个路径",
                                                             result.created_dirs.len(),
                                                             result.skipped_paths.len()),
-                                                    );
-                                                    self.settings_tab.message_is_error = false;
+                                                    });
                                                 }
                                                 Err(e) => {
                                                     self.error_message = Some(format!("导入失败: {}", e));
@@ -2459,6 +2458,7 @@ impl App {
                 Modal::EditCard { .. } => "编辑卡片",
                 Modal::ConfirmDelete { .. } => "确认删除",
                 Modal::Error { .. } => "错误",
+                Modal::Info { .. } => "提示",
                 Modal::CreateTree => "新建分类树",
                 _ => "确认",
             };
@@ -2506,6 +2506,21 @@ impl App {
                         (Message::DeleteNodeConfirm, "删除", true),
                     )
                 }
+                Modal::Info { message } => {
+                    (
+                        column![
+                            text("提示")
+                                .color(iced::Color::WHITE)
+                                .size(16),
+                            text(message.clone())
+                                .color(iced::Color::from_rgb(0.3, 0.8, 0.3)),
+                        ]
+                        .spacing(12)
+                        .into(),
+                        (Message::ModalClose, "关闭", false),
+                    )
+                }
+
                 Modal::Error { message } => {
                     (
                         column![

@@ -175,6 +175,7 @@ pub enum Modal {
     PresetDetail { name: String },
     ConfirmDelete { item: String },
     Error { message: String },
+    Info { message: String },
     
     NewNode,
     EditCard { path: String },
