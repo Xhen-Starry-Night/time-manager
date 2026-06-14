@@ -1592,6 +1592,10 @@ impl App {
                         search_input,
                         search_results,
                         Space::new().height(8),
+                        button(text("+ 新建分类树"))
+                            .on_press(Message::ModalOpen(Modal::CreateTree))
+                            .width(Length::Fill),
+                        Space::new().height(4),
                         scrollable(tree_element),
                     ]
                     .spacing(4)
