@@ -262,6 +262,19 @@ impl DataFs {
     }
 
     pub fn rename_preset(&self, old_name: &str, new_name: &str) -> Result<()> {
+        if old_name == new_name {
+            return Ok(());
+        }
+
+        let new_path = self
+            .data_dir
+            .join("presets")
+            .join(format!("{}.json", new_name));
+
+        if new_path.exists() {
+            return Err(DataError::NodeAlreadyExists(new_name.into()));
+        }
+
         let mut preset = self.get_preset(old_name)?;
         let old_path = self
             .data_dir
