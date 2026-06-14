@@ -92,6 +92,7 @@ pub struct CategoryTabState {
     
     pub new_tree_name: String,
     pub new_tree_import_path: String,
+    pub new_tree_import_rules_path: String,
     pub new_node_form: Option<NewNodeForm>,
     pub edit_card_form: Option<EditCardForm>,
     pub delete_target: Option<(String, bool)>,

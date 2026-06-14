@@ -96,6 +96,7 @@ pub enum Message {
     
     CreateTreeNameChanged(String),
     CreateTreeImportPathChanged(String),
+    CreateTreeImportRulesPathChanged(String),
     DeleteNodeOpen(String, bool),
     DeleteNodeConfirm,
     

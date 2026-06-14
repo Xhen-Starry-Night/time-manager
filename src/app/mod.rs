@@ -472,6 +472,11 @@ impl App {
                 Task::none()
             }
 
+            Message::CreateTreeImportRulesPathChanged(val) => {
+                self.category_tab.new_tree_import_rules_path = val;
+                Task::none()
+            }
+
             Message::NewNodeNameChanged(name) => {
                 if let Some(ref mut form) = self.category_tab.new_node_form {
                     form.name = name;
@@ -1083,6 +1088,7 @@ impl App {
                     Modal::CreateTree => {
                         self.category_tab.new_tree_name.clear();
                         self.category_tab.new_tree_import_path.clear();
+                        self.category_tab.new_tree_import_rules_path.clear();
                     }
                     _ => {}
                 }
@@ -1238,7 +1244,12 @@ impl App {
                                         if import_dir.exists() {
                                             let data_dir = self.data_dir.clone();
                                             let tree_name = name.clone();
-                                            let ignore_file = data_dir.join(".timeignore");
+                                            let rules_path = self.category_tab.new_tree_import_rules_path.clone();
+                                            let ignore_file = if rules_path.is_empty() {
+                                                data_dir.join(".timeignore")
+                                            } else {
+                                                std::path::PathBuf::from(&rules_path)
+                                            };
                                             let rules = crate::obsidian::TimeignoreRules::from_file(&ignore_file)
                                                 .unwrap_or_else(|_| crate::obsidian::TimeignoreRules::default_rules());
                                             match crate::obsidian::import_from_obsidian(
@@ -1260,6 +1271,7 @@ impl App {
                                     }
                                     self.category_tab.new_tree_name.clear();
                                     self.category_tab.new_tree_import_path.clear();
+                                    self.category_tab.new_tree_import_rules_path.clear();
                                     // always reload trees
                                     let trees = self.data_fs.list_trees().unwrap_or_default();
                                     let tree_nodes = self.build_tree_nodes(&trees, &self.review_tab.cards);
@@ -2644,6 +2656,9 @@ impl App {
                             text("从 Obsidian 导入（可选）:").color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
                             text_input("Obsidian 仓库路径", &self.category_tab.new_tree_import_path)
                                 .on_input(Message::CreateTreeImportPathChanged),
+                            text("忽略规则文件（可选）:").color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                            text_input("规则文件路径，留空使用默认", &self.category_tab.new_tree_import_rules_path)
+                                .on_input(Message::CreateTreeImportRulesPathChanged),
                         ]
                         .spacing(8)
                         .into(),
