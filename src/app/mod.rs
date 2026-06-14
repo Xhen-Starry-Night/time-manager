@@ -30,6 +30,7 @@ use preset_tab::PresetTabState;
 use settings_tab::SettingsTabState;
 
 pub struct App {
+    pub default_preset: String,
     active_tab: TabId,
     data_dir: PathBuf,
     data_fs: DataFs,
@@ -60,11 +61,19 @@ impl App {
                             .unwrap_or_else(|| PathBuf::from("./data"))
                 });
                 
+                let config = Config::load(&Config::config_path()).unwrap_or_default();
+                let data_dir = config.data_dir.clone()
+                    .map(PathBuf::from)
+                    .unwrap_or(data_dir);
+                let default_preset = config.default_preset.clone()
+                    .unwrap_or_else(|| "default".into());
+                
                 let data_fs = DataFs::init(data_dir.clone()).expect("Failed to init data dir");
                 let timer_manager = TimerManager::new(data_dir.clone());
                 let data_fs_arc = Arc::new(data_fs);
                 
                 let state = App {
+                    default_preset,
                     active_tab: TabId::Category,
                     data_dir: data_dir.clone(),
                     data_fs: (*data_fs_arc).clone(),
@@ -78,7 +87,7 @@ impl App {
                     settings_tab: SettingsTabState::new(
                         Config::config_dir(),
                         Config::config_path(),
-                        Config::default(),
+                        config,
                     ),
                     
                     timer_manager,
