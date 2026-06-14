@@ -1396,95 +1396,111 @@ impl App {
     }
     
     fn build_tree_nodes(&self, trees: &[String], cards: &[(String, Card)]) -> Vec<TreeNode> {
+        let data_dir = self.data_fs.data_dir().clone();
         let mut result: Vec<TreeNode> = Vec::new();
-        
+
         for tree_name in trees {
-            let tree_cards: Vec<(String, &Card)> = cards
-                .iter()
-                .filter(|(path, _)| path.starts_with(&format!("{}/", tree_name)))
-                .map(|(path, card)| (path.clone(), card))
-                .collect();
-            
             let mut tree_node = TreeNode {
                 name: tree_name.clone(),
                 path: tree_name.clone(),
                 is_card: false,
-                children: Vec::new(),
+                children: Self::scan_folder_nodes(&data_dir, tree_name, ""),
             };
-            
-            // 扫描实际目录结构
-            if let Ok(entries) = std::fs::read_dir(self.data_fs.data_dir().join("categories").join(tree_name)) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_dir() {
-                        let folder_name = path.file_name().unwrap().to_string_lossy().to_string();
-                        let folder_path = format!("{}/{}", tree_name, folder_name);
-                        
-                        // 检查是否已存在该文件夹节点
-                        if !tree_node.children.iter().any(|n| n.path == folder_path) {
-                            let folder_node = TreeNode {
-                                name: folder_name,
-                                path: folder_path,
-                                is_card: false,
-                                children: Vec::new(),
-                            };
-                            tree_node.children.push(folder_node);
-                        }
-                    }
-                }
-            }
-            
-            for (card_path, _card) in tree_cards {
-                let relative_path = card_path.strip_prefix(&format!("{}/", tree_name)).unwrap_or(&card_path);
-                let parts: Vec<&str> = relative_path.split('/').collect();
-                
+
+            for (card_path, _card) in cards.iter().filter(|(p, _)| p.starts_with(&format!("{}/", tree_name))) {
+                let relative = card_path.strip_prefix(&format!("{}/", tree_name)).unwrap_or(card_path);
+                let parts: Vec<&str> = relative.split('/').collect();
+                let card_name = parts.last().unwrap().to_string();
+
                 if parts.len() == 1 {
                     tree_node.children.push(TreeNode {
-                        name: parts[0].to_string(),
+                        name: card_name,
                         path: card_path.clone(),
                         is_card: true,
                         children: Vec::new(),
                     });
                 } else {
-                    let folder_name = parts[0].to_string();
-                    let folder_path = format!("{}/{}", tree_name, folder_name);
-                    
-                    let folder = tree_node.children.iter_mut()
-                        .find(|n| n.path == folder_path);
-                    
-                    if let Some(folder) = folder {
-                        let card_name = parts.last().unwrap().to_string();
-                        folder.children.push(TreeNode {
-                            name: card_name,
-                            path: card_path.clone(),
-                            is_card: true,
-                            children: Vec::new(),
-                        });
-                    } else {
-                        let mut new_folder = TreeNode {
-                            name: folder_name.clone(),
-                            path: folder_path.clone(),
-                            is_card: false,
-                            children: Vec::new(),
-                        };
-                        
-                        let card_name = parts.last().unwrap().to_string();
-                        new_folder.children.push(TreeNode {
-                            name: card_name,
-                            path: card_path.clone(),
-                            is_card: true,
-                            children: Vec::new(),
-                        });
-                        
-                        tree_node.children.push(new_folder);
-                    }
+                    Self::add_card_to_node(&mut tree_node.children, card_path, &parts[..parts.len() - 1], &card_name);
                 }
             }
-            
+
             result.push(tree_node);
         }
-        
+
         result
+    }
+
+    fn scan_folder_nodes(data_dir: &std::path::Path, tree_name: &str, rel_path: &str) -> Vec<TreeNode> {
+        let dir_path = data_dir.join("categories").join(tree_name).join(rel_path);
+        let mut nodes = Vec::new();
+
+        if let Ok(entries) = std::fs::read_dir(&dir_path) {
+            for entry in entries.flatten() {
+                let entry_path = entry.path();
+                if entry_path.is_dir() {
+                    let folder_name = entry.file_name().to_string_lossy().to_string();
+                    let child_rel = if rel_path.is_empty() {
+                        folder_name.clone()
+                    } else {
+                        format!("{}/{}", rel_path, folder_name)
+                    };
+                    let full_path = format!("{}/{}", tree_name, child_rel);
+                    nodes.push(TreeNode {
+                        name: folder_name,
+                        path: full_path,
+                        is_card: false,
+                        children: Self::scan_folder_nodes(data_dir, tree_name, &child_rel),
+                    });
+                }
+            }
+        }
+
+        nodes
+    }
+
+    fn add_card_to_node(nodes: &mut Vec<TreeNode>, card_path: &str, folder_parts: &[&str], card_name: &str) {
+        if let Some(first) = folder_parts.first() {
+            let tree_name = card_path.split('/').next().unwrap_or("");
+            let folder_path = {
+                let mut p = tree_name.to_string();
+                for part in folder_parts {
+                    p.push('/');
+                    p.push_str(part);
+                }
+                p
+            };
+
+            if let Some(node) = nodes.iter_mut().find(|n| n.name == *first) {
+                if folder_parts.len() == 1 {
+                    node.children.push(TreeNode {
+                        name: card_name.to_string(),
+                        path: card_path.to_string(),
+                        is_card: true,
+                        children: Vec::new(),
+                    });
+                } else {
+                    Self::add_card_to_node(&mut node.children, card_path, &folder_parts[1..], card_name);
+                }
+            } else {
+                let mut new_node = TreeNode {
+                    name: first.to_string(),
+                    path: folder_path,
+                    is_card: false,
+                    children: Vec::new(),
+                };
+                if folder_parts.len() == 1 {
+                    new_node.children.push(TreeNode {
+                        name: card_name.to_string(),
+                        path: card_path.to_string(),
+                        is_card: true,
+                        children: Vec::new(),
+                    });
+                } else {
+                    Self::add_card_to_node(&mut new_node.children, card_path, &folder_parts[1..], card_name);
+                }
+                nodes.push(new_node);
+            }
+        }
     }
     
     fn view(&self) -> Element<Message> {
@@ -2758,7 +2774,8 @@ fn card_action_buttons(path: &str) -> Element<Message> {
 
 fn folder_action_buttons(path: &str) -> Element<Message> {
     let path = path.to_string();
-    row![
+    let is_tree_root = !path.contains('/');
+    let mut btns = row![
         button(
             text("新建卡片").color(iced::Color::WHITE)
         )
@@ -2785,22 +2802,26 @@ fn folder_action_buttons(path: &str) -> Element<Message> {
             },
             ..Default::default()
         }),
-        button(
-            text("删除").color(iced::Color::WHITE)
-        )
-        .on_press(Message::DeleteNodeOpen(path.clone(), true))
-        .style(|_, _| iced::widget::button::Style {
-            background: Some(iced::Color::from_rgb(0.7, 0.3, 0.3).into()),
-            text_color: iced::Color::WHITE,
-            border: iced::Border {
-                radius: 4.0.into(),
-                ..Default::default()
-            },
-            ..Default::default()
-        }),
     ]
-    .spacing(8)
-    .into()
+    .spacing(8);
+
+    if !is_tree_root {
+        btns = btns.push(
+            button(text("删除").color(iced::Color::WHITE))
+                .on_press(Message::DeleteNodeOpen(path.clone(), true))
+                .style(|_, _| iced::widget::button::Style {
+                    background: Some(iced::Color::from_rgb(0.7, 0.3, 0.3).into()),
+                    text_color: iced::Color::WHITE,
+                    border: iced::Border {
+                        radius: 4.0.into(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }),
+        );
+    }
+
+    btns.into()
 }
 
 fn tab_button(label: &str, tab_id: TabId, active_tab: TabId) -> Element<Message> {
