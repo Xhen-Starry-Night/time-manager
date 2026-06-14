@@ -2066,10 +2066,21 @@ impl App {
             TabId::Preset => {
                 let preset_list: Vec<_> = self.preset_tab.presets.iter()
                     .map(|preset| {
+                        let name = preset.name.clone();
+                        let trained = if let Some(ts) = preset.trained_at {
+                            ts.format("%Y-%m-%d %H:%M").to_string()
+                        } else {
+                            "未训练".to_string()
+                        };
                         row![
-                            text(preset.name.clone()).color(iced::Color::WHITE),
-                            text(if preset.fsrs_parameters.as_ref().map_or(true, |p| p.is_empty()) { "默认参数" } else { "已训练" })
-                                .color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                            text(preset.name.clone()).color(iced::Color::WHITE).width(Length::Fill),
+                            text(trained).color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                            button(text("编辑").size(12))
+                                .style(iced::widget::button::text)
+                                .on_press(Message::PresetEditOpen(name.clone())),
+                            button(text("删除").size(12))
+                                .style(iced::widget::button::text)
+                                .on_press(Message::PresetDeleteRequested(name.clone())),
                         ]
                         .spacing(8)
                         .padding(8)
@@ -2077,8 +2088,8 @@ impl App {
                         .into()
                     })
                     .collect();
-                
-                let content = if self.preset_tab.presets.is_empty() {
+
+                let list = if self.preset_tab.presets.is_empty() {
                     container(text("暂无预设").color(iced::Color::from_rgb(0.6, 0.6, 0.6)))
                         .width(Length::Fill)
                         .height(Length::Fill)
@@ -2089,21 +2100,88 @@ impl App {
                         .width(Length::Fill)
                         .height(Length::Fill)
                 };
-                
-                container(
-                    column![
-                        row![text("预设").size(20).color(iced::Color::WHITE)].padding(8),
-                        rule::horizontal(1.0),
-                        content
-                    ]
-                )
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .style(|_: &iced::Theme| iced::widget::container::Style {
-                    background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
-                    ..Default::default()
-                })
-                .into()
+
+                let mut col = column![
+                    row![
+                        text("预设").size(20).color(iced::Color::WHITE),
+                        iced::widget::Space::new().width(Length::Fill),
+                        button(text("+ 新建"))
+                            .on_press(Message::PresetCreateOpen),
+                    ].padding(8),
+                    rule::horizontal(1.0),
+                    list,
+                ];
+
+                // form modal overlay
+                if self.preset_tab.show_form {
+                    let title = if self.preset_tab.editing_name.is_some() { "编辑预设" } else { "新建预设" };
+                    let name_input = text_input("预设名称", &self.preset_tab.form_name)
+                        .on_input(Message::PresetFormNameChanged);
+                    let desc_input = text_input("描述（可选）", &self.preset_tab.form_description)
+                        .on_input(Message::PresetFormDescriptionChanged);
+                    let rules_input = text_input("匹配规则（一行一条）", &self.preset_tab.form_match_rules)
+                        .on_input(Message::PresetFormMatchRulesChanged);
+
+                    let mut form_col = column![
+                        text(title).size(16).color(iced::Color::WHITE),
+                        name_input,
+                        desc_input,
+                        rules_input,
+                    ];
+
+                    if let Some(ref err) = self.preset_tab.form_error {
+                        form_col = form_col.push(text(err.clone()).color(iced::Color::from_rgb(1.0, 0.3, 0.3)));
+                    }
+
+                    form_col = form_col.push(
+                        row![
+                            iced::widget::Space::new().width(Length::Fill),
+                            button(text("取消")).on_press(Message::PresetFormDismissed),
+                            button(text("保存")).on_press(Message::PresetFormSaveRequested),
+                        ].spacing(8)
+                    );
+
+                    col = col.push(
+                        container(form_col.spacing(8).padding(16))
+                            .width(Length::Fill)
+                            .style(|_: &iced::Theme| iced::widget::container::Style {
+                                background: Some(iced::Color::from_rgb(0.15, 0.15, 0.15).into()),
+                                border: iced::Border::default().rounded(4),
+                                ..Default::default()
+                            })
+                    );
+                }
+
+                // delete confirm overlay
+                if let Some(ref target) = self.preset_tab.delete_target {
+                    let confirm_col = column![
+                        text(format!("确定删除预设「{target}」？")).color(iced::Color::WHITE),
+                        row![
+                            iced::widget::Space::new().width(Length::Fill),
+                            button(text("取消")).on_press(Message::PresetDeleteDismissed),
+                            button(text("删除")).on_press(Message::PresetDeleteConfirmed(target.clone())),
+                        ].spacing(8),
+                    ].spacing(8).padding(16);
+
+                    col = col.push(
+                        container(confirm_col)
+                            .width(Length::Fill)
+                            .style(|_: &iced::Theme| iced::widget::container::Style {
+                                background: Some(iced::Color::from_rgb(0.15, 0.15, 0.15).into()),
+                                border: iced::Border::default().rounded(4),
+                                ..Default::default()
+                            })
+                    );
+                }
+
+                container(col.spacing(4))
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .style(|_: &iced::Theme| iced::widget::container::Style {
+                        background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
+                        ..Default::default()
+                    })
+                    .into()
             }
             TabId::Settings => {
                 container(
