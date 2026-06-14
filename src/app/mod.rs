@@ -1231,6 +1231,7 @@ impl App {
                                     self.error_message = Some(e.to_string());
                                 } else {
                                     let import_path = self.category_tab.new_tree_import_path.trim().to_string();
+                                    let mut import_result = None;
                                     if !import_path.is_empty() {
                                         let import_dir = std::path::PathBuf::from(&import_path);
                                         if import_dir.exists() {
@@ -1246,11 +1247,7 @@ impl App {
                                                 &rules,
                                             ) {
                                                 Ok(result) => {
-                                                    self.modal = Some(Modal::Info {
-                                                        message: format!("导入完成: 创建 {} 个目录, 跳过 {} 个路径",
-                                                            result.created_dirs.len(),
-                                                            result.skipped_paths.len()),
-                                                    });
+                                                    import_result = Some(result);
                                                 }
                                                 Err(e) => {
                                                     self.error_message = Some(format!("导入失败: {}", e));
@@ -1260,14 +1257,23 @@ impl App {
                                             self.error_message = Some("导入路径不存在".into());
                                         }
                                     }
-                                    self.modal = None;
                                     self.category_tab.new_tree_name.clear();
                                     self.category_tab.new_tree_import_path.clear();
-                                    // reload trees
+                                    // always reload trees
                                     let trees = self.data_fs.list_trees().unwrap_or_default();
                                     let tree_nodes = self.build_tree_nodes(&trees, &self.review_tab.cards);
                                     self.category_tab.tree_nodes = tree_nodes.clone();
                                     self.category_tab.tree_view.expand_all(&tree_nodes);
+                                    // show import result in modal, otherwise close
+                                    if let Some(result) = import_result {
+                                        self.modal = Some(Modal::Info {
+                                            message: format!("导入完成: 创建 {} 个目录, 跳过 {} 个路径",
+                                                result.created_dirs.len(),
+                                                result.skipped_paths.len()),
+                                        });
+                                    } else {
+                                        self.modal = None;
+                                    }
                                 }
                             }
                         }
