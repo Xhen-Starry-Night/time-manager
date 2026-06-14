@@ -188,16 +188,33 @@ fn test_schedule_operations() {
     let dir = tempdir().unwrap();
     let fs = DataFs::init(dir.path().to_path_buf()).unwrap();
 
-    let id = uuid::Uuid::new_v4();
-    let ics_content = "BEGIN:VCALENDAR\nVERSION:2.0\nEND:VCALENDAR";
+    let schedule = time_manager::data::models::Schedule {
+        id: uuid::Uuid::new_v4(),
+        summary: "测试".to_string(),
+        dtstart: chrono::DateTime::from_naive_utc_and_offset(
+            chrono::NaiveDate::from_ymd_opt(2026, 6, 14).unwrap().and_hms_opt(14, 0, 0).unwrap(),
+            chrono::Utc,
+        ),
+        dtend: chrono::DateTime::from_naive_utc_and_offset(
+            chrono::NaiveDate::from_ymd_opt(2026, 6, 14).unwrap().and_hms_opt(15, 0, 0).unwrap(),
+            chrono::Utc,
+        ),
+        description: None,
+        location: None,
+        categories: Vec::new(),
+        priority: None,
+        rrule: time_manager::data::models::RecurrenceRule::None,
+        reminder_minutes: None,
+    };
 
-    fs.save_schedule(&id, ics_content).unwrap();
+    fs.save_schedule(&schedule).unwrap();
 
-    let retrieved = fs.get_schedule(&id).unwrap();
-    assert!(retrieved.contains("VCALENDAR"));
+    let retrieved = fs.get_schedule(&schedule.id).unwrap();
+    assert_eq!(retrieved.summary, "测试");
 
     let schedules = fs.list_schedules().unwrap();
     assert_eq!(schedules.len(), 1);
+    assert_eq!(schedules[0].summary, "测试");
 }
 
 #[test]
@@ -297,4 +314,53 @@ fn test_preset_with_parameters() {
 
     assert!(preset.fsrs_parameters.is_some());
     assert_eq!(preset.match_rules.len(), 1);
+}
+
+#[test]
+fn test_schedule_ics_roundtrip() {
+    use time_manager::data::schedule::{format_ics, parse_ics};
+    use time_manager::data::models::{RecurrenceRule, Schedule};
+    use uuid::Uuid;
+
+    let dt = |y: i32, m: u32, d: u32, h: u32, min: u32| {
+        chrono::DateTime::from_naive_utc_and_offset(
+            chrono::NaiveDate::from_ymd_opt(y, m, d).unwrap().and_hms_opt(h, min, 0).unwrap(),
+            chrono::Utc,
+        )
+    };
+    let schedule = Schedule {
+        id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+        summary: "测试日程".to_string(),
+        dtstart: dt(2026, 6, 14, 14, 0),
+        dtend: dt(2026, 6, 14, 15, 0),
+        description: Some("描述内容".to_string()),
+        location: Some("图书馆".to_string()),
+        categories: vec!["学习".to_string(), "Rust".to_string()],
+        priority: Some(5),
+        rrule: RecurrenceRule::Weekly,
+        reminder_minutes: Some(15),
+    };
+
+    let ics = format_ics(&schedule);
+    let parsed = parse_ics(&ics).expect("Failed to parse generated ICS");
+
+    assert_eq!(parsed.id, schedule.id);
+    assert_eq!(parsed.summary, schedule.summary);
+    assert_eq!(parsed.dtstart, schedule.dtstart);
+    assert_eq!(parsed.dtend, schedule.dtend);
+    assert_eq!(parsed.description, schedule.description);
+    assert_eq!(parsed.location, schedule.location);
+    assert_eq!(parsed.categories, schedule.categories);
+    assert_eq!(parsed.priority, schedule.priority);
+    assert_eq!(parsed.rrule, schedule.rrule);
+    assert_eq!(parsed.reminder_minutes, schedule.reminder_minutes);
+}
+
+#[test]
+fn test_parse_invalid_ics() {
+    use time_manager::data::schedule::parse_ics;
+
+    assert!(parse_ics("").is_err());
+    assert!(parse_ics("BEGIN:VCALENDAR\nEND:VCALENDAR").is_err());
+    assert!(parse_ics("INVALID").is_err());
 }

@@ -86,9 +86,26 @@ fn test_todo_to_schedule_workflow() {
     let todos = fs.list_todos().unwrap();
     assert_eq!(todos.len(), 1);
 
-    let ics_content = "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART:20260610T100000\nDTEND:20260610T110000\nSUMMARY:复习数学\nEND:VEVENT\nEND:VCALENDAR";
-    let schedule_id = uuid::Uuid::new_v4();
-    fs.save_schedule(&schedule_id, ics_content).unwrap();
+    let schedule = time_manager::data::models::Schedule {
+        id: uuid::Uuid::new_v4(),
+        summary: "复习数学".to_string(),
+        dtstart: chrono::DateTime::from_naive_utc_and_offset(
+            chrono::NaiveDate::from_ymd_opt(2026, 6, 10).unwrap().and_hms_opt(10, 0, 0).unwrap(),
+            chrono::Utc,
+        ),
+        dtend: chrono::DateTime::from_naive_utc_and_offset(
+            chrono::NaiveDate::from_ymd_opt(2026, 6, 10).unwrap().and_hms_opt(11, 0, 0).unwrap(),
+            chrono::Utc,
+        ),
+        description: None,
+        location: None,
+        categories: Vec::new(),
+        priority: None,
+        rrule: time_manager::data::models::RecurrenceRule::None,
+        reminder_minutes: None,
+    };
+    let schedule_id = schedule.id;
+    fs.save_schedule(&schedule).unwrap();
     fs.delete_todo(&todo_id).unwrap();
 
     let todos_after = fs.list_todos().unwrap();
