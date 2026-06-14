@@ -805,12 +805,13 @@ impl App {
                             
                             match predictor.predict_from_records(&card.review_records, current_state, 0.9) {
                                 Ok((next_review, new_state)) => {
+                                    let existing = card.prediction.as_ref().map(|p| p.preset_used.clone());
                                     use crate::data::models::Prediction;
                                     card.prediction = Some(Prediction {
                                         algorithm: "fsrs".to_string(),
                                         next_review,
                                         fsrs_state_bytes: crate::fsrs::FsrsPredictor::memory_state_to_bytes(&new_state),
-                                        preset_used: default_preset.clone(),
+                                        preset_used: existing.unwrap_or_else(|| default_preset.clone()),
                                     });
                                     let _ = data_fs.save_card(&path, &card);
                                 }

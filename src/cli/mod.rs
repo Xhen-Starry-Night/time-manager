@@ -114,6 +114,8 @@ pub enum Commands {
         end: String,
         #[arg(long)]
         summary: String,
+        #[arg(short, long)]
+        priority: Option<i32>,
     },
 
     #[command(name = "schedule-list")]

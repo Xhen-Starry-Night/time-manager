@@ -21,6 +21,13 @@ fn main() {
 fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
     use time_manager::cli::Commands::*;
 
+    let default_preset = time_manager::data::config::Config::load(
+        &time_manager::data::config::Config::config_path(),
+    )
+    .ok()
+    .and_then(|c| c.default_preset)
+    .unwrap_or_else(|| "default".into());
+
     match cli.command {
         Init => {
             let dir = data_dir.clone();
@@ -81,7 +88,7 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
         CardCreate { path, preset } => {
             let fs = DataFs::init(data_dir)?;
 
-            let preset_name = preset.unwrap_or_else(|| "default".to_string());
+            let preset_name = preset.unwrap_or_else(|| default_preset.clone());
 
             if fs.get_preset(&preset_name).is_err() {
                 println!("Warning: Preset '{}' not found, using default", preset_name);
@@ -307,7 +314,7 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
             let mut manager = time_manager::timer::TimerManager::new(data_dir);
             manager
                 .start()
-                .map_err(time_manager::data::DataError::InvalidData)?;
+                .map_err(time_manager::data::DataError::Io)?;
             println!("Timer started: {}", manager.get_state().elapsed_string());
         }
 
@@ -315,7 +322,7 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
             let mut manager = time_manager::timer::TimerManager::new(data_dir);
             manager
                 .pause()
-                .map_err(time_manager::data::DataError::InvalidData)?;
+                .map_err(time_manager::data::DataError::Io)?;
             println!("Timer paused: {}", manager.get_state().elapsed_string());
         }
 
@@ -323,7 +330,7 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
             let mut manager = time_manager::timer::TimerManager::new(data_dir);
             let timer_file = manager
                 .stop()
-                .map_err(time_manager::data::DataError::InvalidData)?;
+                .map_err(time_manager::data::DataError::Io)?;
             println!("Timer stopped. Saved to: {:?}", timer_file);
             println!("Duration: {}", manager.get_state().elapsed_string());
         }
@@ -414,6 +421,7 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
             start,
             end,
             summary,
+            priority,
         } => {
             let fs = DataFs::init(data_dir)?;
             use time_manager::data::models::{Schedule, RecurrenceRule};
@@ -431,7 +439,7 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
                 description: None,
                 location: None,
                 categories: Vec::new(),
-                priority: None,
+                priority,
                 rrule: RecurrenceRule::None,
                 reminder_minutes: None,
             };

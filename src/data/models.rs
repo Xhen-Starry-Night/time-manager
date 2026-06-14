@@ -330,17 +330,3 @@ pub struct Schedule {
     pub reminder_minutes: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Config {
-    pub default_preset: String,
-    pub default_algorithm: String,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            default_preset: "default".into(),
-            default_algorithm: "fsrs".into(),
-        }
-    }
-}
