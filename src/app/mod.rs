@@ -467,6 +467,11 @@ impl App {
                 Task::none()
             }
 
+            Message::CreateTreeImportPathChanged(path) => {
+                self.category_tab.new_tree_import_path = path;
+                Task::none()
+            }
+
             Message::NewNodeNameChanged(name) => {
                 if let Some(ref mut form) = self.category_tab.new_node_form {
                     form.name = name;
@@ -1076,6 +1081,7 @@ impl App {
                     }
                     Modal::CreateTree => {
                         self.category_tab.new_tree_name.clear();
+                        self.category_tab.new_tree_import_path.clear();
                     }
                     _ => {}
                 }
@@ -1220,19 +1226,49 @@ impl App {
                         Modal::CreateTree => {
                             let name = self.category_tab.new_tree_name.trim().to_string();
                             if !name.is_empty() {
-                                match self.data_fs.create_tree(&name) {
-                                    Ok(()) => {
-                                        self.modal = None;
-                                        self.category_tab.new_tree_name.clear();
-                                        // reload trees
-                                        let trees = self.data_fs.list_trees().unwrap_or_default();
-                                        let tree_nodes = self.build_tree_nodes(&trees, &self.review_tab.cards);
-                                        self.category_tab.tree_nodes = tree_nodes.clone();
-                                        self.category_tab.tree_view.expand_all(&tree_nodes);
+                                let result = self.data_fs.create_tree(&name);
+                                if let Err(e) = result {
+                                    self.error_message = Some(e.to_string());
+                                } else {
+                                    let import_path = self.category_tab.new_tree_import_path.trim().to_string();
+                                    if !import_path.is_empty() {
+                                        let import_dir = std::path::PathBuf::from(&import_path);
+                                        if import_dir.exists() {
+                                            let data_dir = self.data_dir.clone();
+                                            let tree_name = name.clone();
+                                            let ignore_file = data_dir.join(".timeignore");
+                                            let rules = crate::obsidian::TimeignoreRules::from_file(&ignore_file)
+                                                .unwrap_or_else(|_| crate::obsidian::TimeignoreRules::default_rules());
+                                            match crate::obsidian::import_from_obsidian(
+                                                &import_dir,
+                                                &tree_name,
+                                                &data_dir,
+                                                &rules,
+                                            ) {
+                                                Ok(result) => {
+                                                    self.settings_tab.message = Some(
+                                                        format!("导入完成: 创建 {} 个目录, 跳过 {} 个路径",
+                                                            result.created_dirs.len(),
+                                                            result.skipped_paths.len()),
+                                                    );
+                                                    self.settings_tab.message_is_error = false;
+                                                }
+                                                Err(e) => {
+                                                    self.error_message = Some(format!("导入失败: {}", e));
+                                                }
+                                            }
+                                        } else {
+                                            self.error_message = Some("导入路径不存在".into());
+                                        }
                                     }
-                                    Err(e) => {
-                                        self.error_message = Some(e.to_string());
-                                    }
+                                    self.modal = None;
+                                    self.category_tab.new_tree_name.clear();
+                                    self.category_tab.new_tree_import_path.clear();
+                                    // reload trees
+                                    let trees = self.data_fs.list_trees().unwrap_or_default();
+                                    let tree_nodes = self.build_tree_nodes(&trees, &self.review_tab.cards);
+                                    self.category_tab.tree_nodes = tree_nodes.clone();
+                                    self.category_tab.tree_view.expand_all(&tree_nodes);
                                 }
                             }
                         }
@@ -2585,6 +2621,10 @@ impl App {
                             text("输入新分类树名称:").color(iced::Color::WHITE),
                             text_input("分类树名称", &self.category_tab.new_tree_name)
                                 .on_input(Message::CreateTreeNameChanged),
+                            Space::new().height(8),
+                            text("从 Obsidian 导入（可选）:").color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                            text_input("Obsidian 仓库路径", &self.category_tab.new_tree_import_path)
+                                .on_input(Message::CreateTreeImportPathChanged),
                         ]
                         .spacing(8)
                         .into(),

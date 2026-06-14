@@ -95,6 +95,7 @@ pub enum Message {
     EditCardConfirm,
     
     CreateTreeNameChanged(String),
+    CreateTreeImportPathChanged(String),
     DeleteNodeOpen(String, bool),
     DeleteNodeConfirm,
     
