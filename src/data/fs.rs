@@ -248,6 +248,34 @@ impl DataFs {
         Ok(presets)
     }
 
+    pub fn delete_preset(&self, name: &str) -> Result<()> {
+        let file_path = self
+            .data_dir
+            .join("presets")
+            .join(format!("{}.json", name));
+
+        if file_path.exists() {
+            std::fs::remove_file(&file_path).map_err(|e| DataError::Io(e.to_string()))?;
+        }
+
+        Ok(())
+    }
+
+    pub fn rename_preset(&self, old_name: &str, new_name: &str) -> Result<()> {
+        let mut preset = self.get_preset(old_name)?;
+        let old_path = self
+            .data_dir
+            .join("presets")
+            .join(format!("{}.json", old_name));
+
+        preset.name = new_name.into();
+        self.save_preset(&preset)?;
+
+        std::fs::remove_file(&old_path).map_err(|e| DataError::Io(e.to_string()))?;
+
+        Ok(())
+    }
+
     pub fn save_todo(&self, todo: &Todo) -> Result<()> {
         let file_path = self
             .data_dir
