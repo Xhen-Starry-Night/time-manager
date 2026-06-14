@@ -726,7 +726,9 @@ impl App {
             
             Message::DeleteNodeConfirm => {
                 if let Some((path, is_folder)) = self.category_tab.delete_target.take() {
-                    let result = if is_folder {
+                    let result = if !path.contains('/') {
+                        self.data_fs.delete_tree(&path)
+                    } else if is_folder {
                         self.data_fs.delete_folder(&path)
                     } else {
                         self.data_fs.delete_card(&path)
@@ -2802,24 +2804,19 @@ fn folder_action_buttons(path: &str) -> Element<Message> {
             },
             ..Default::default()
         }),
+        button(text("删除").color(iced::Color::WHITE))
+            .on_press(Message::DeleteNodeOpen(path.clone(), is_tree_root))
+            .style(|_, _| iced::widget::button::Style {
+                background: Some(iced::Color::from_rgb(0.7, 0.3, 0.3).into()),
+                text_color: iced::Color::WHITE,
+                border: iced::Border {
+                    radius: 4.0.into(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            }),
     ]
     .spacing(8);
-
-    if !is_tree_root {
-        btns = btns.push(
-            button(text("删除").color(iced::Color::WHITE))
-                .on_press(Message::DeleteNodeOpen(path.clone(), true))
-                .style(|_, _| iced::widget::button::Style {
-                    background: Some(iced::Color::from_rgb(0.7, 0.3, 0.3).into()),
-                    text_color: iced::Color::WHITE,
-                    border: iced::Border {
-                        radius: 4.0.into(),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                }),
-        );
-    }
 
     btns.into()
 }

@@ -429,6 +429,14 @@ impl DataFs {
         Ok(())
     }
 
+    pub fn delete_tree(&self, tree_name: &str) -> Result<()> {
+        let dir_path = self.data_dir.join("categories").join(tree_name);
+        if dir_path.exists() {
+            std::fs::remove_dir_all(&dir_path).map_err(|e| DataError::Io(e.to_string()))?;
+        }
+        Ok(())
+    }
+
     pub fn rename_card(&self, old_path: &str, new_name: &str) -> Result<String> {
         let (tree, old_card_path) = Self::parse_path(old_path)?;
         
