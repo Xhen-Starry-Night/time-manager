@@ -90,6 +90,7 @@ pub struct CategoryTabState {
     pub search_selected_index: Option<usize>,
     pub search_focused: bool,
     
+    pub new_tree_name: String,
     pub new_node_form: Option<NewNodeForm>,
     pub edit_card_form: Option<EditCardForm>,
     pub delete_target: Option<(String, bool)>,

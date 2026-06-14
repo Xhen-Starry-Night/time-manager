@@ -94,6 +94,7 @@ pub enum Message {
     EditCardNewReviewQualityChanged(MemoryQuality),
     EditCardConfirm,
     
+    CreateTreeNameChanged(String),
     DeleteNodeOpen(String, bool),
     DeleteNodeConfirm,
     
@@ -176,6 +177,7 @@ pub enum Modal {
     
     NewNode,
     EditCard { path: String },
+    CreateTree,
 }
 
 #[derive(Debug, Clone)]

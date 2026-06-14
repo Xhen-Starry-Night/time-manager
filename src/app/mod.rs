@@ -461,6 +461,11 @@ impl App {
                 Task::none()
             }
             
+            Message::CreateTreeNameChanged(name) => {
+                self.category_tab.new_tree_name = name;
+                Task::none()
+            }
+
             Message::NewNodeNameChanged(name) => {
                 if let Some(ref mut form) = self.category_tab.new_node_form {
                     form.name = name;
@@ -1066,6 +1071,9 @@ impl App {
                             self.todo_tab.load_todo_for_edit(&todo_clone);
                         }
                     }
+                    Modal::CreateTree => {
+                        self.category_tab.new_tree_name.clear();
+                    }
                     _ => {}
                 }
                 self.modal = Some(modal);
@@ -1202,6 +1210,25 @@ impl App {
                                         Err(e) => {
                                             self.error_message = Some(e.to_string());
                                         }
+                                    }
+                                }
+                            }
+                        }
+                        Modal::CreateTree => {
+                            let name = self.category_tab.new_tree_name.trim().to_string();
+                            if !name.is_empty() {
+                                match self.data_fs.create_tree(&name) {
+                                    Ok(()) => {
+                                        self.modal = None;
+                                        self.category_tab.new_tree_name.clear();
+                                        // reload trees
+                                        let trees = self.data_fs.list_trees().unwrap_or_default();
+                                        let tree_nodes = self.build_tree_nodes(&trees, &self.review_tab.cards);
+                                        self.category_tab.tree_nodes = tree_nodes.clone();
+                                        self.category_tab.tree_view.expand_all(&tree_nodes);
+                                    }
+                                    Err(e) => {
+                                        self.error_message = Some(e.to_string());
                                     }
                                 }
                             }
@@ -1479,8 +1506,14 @@ impl App {
             TabId::Category => {
                 if self.category_tab.tree_nodes.is_empty() {
                     container(
-                        text("暂无数据 - 请使用 CLI 创建分类树")
-                            .size(16)
+                        column![
+                            text("暂无数据").size(16),
+                            Space::new().height(12),
+                            button(text("新建分类树"))
+                                .on_press(Message::ModalOpen(Modal::CreateTree)),
+                        ]
+                        .spacing(4)
+                        .align_x(iced::Alignment::Center)
                     )
                     .width(Length::Fill)
                     .height(Length::Fill)
@@ -2367,6 +2400,7 @@ impl App {
                 Modal::EditCard { .. } => "编辑卡片",
                 Modal::ConfirmDelete { .. } => "确认删除",
                 Modal::Error { .. } => "错误",
+                Modal::CreateTree => "新建分类树",
                 _ => "确认",
             };
             
@@ -2521,6 +2555,18 @@ impl App {
                     } else {
                         (text("开发中").color(iced::Color::WHITE).into(), (Message::ModalClose, "关闭", false))
                     }
+                }
+                Modal::CreateTree => {
+                    (
+                        column![
+                            text("输入新分类树名称:").color(iced::Color::WHITE),
+                            text_input("分类树名称", &self.category_tab.new_tree_name)
+                                .on_input(Message::CreateTreeNameChanged),
+                        ]
+                        .spacing(8)
+                        .into(),
+                        (Message::ModalConfirm, "创建", true),
+                    )
                 }
                 _ => (text("开发中").color(iced::Color::WHITE).into(), (Message::ModalClose, "关闭", false))
             };
