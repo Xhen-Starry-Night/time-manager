@@ -37,7 +37,8 @@ Phase 5 已完成：
 2. **ICS 解析层**：parse_ics / format_ics 工具函数
 3. **日程列表显示优化**：时间范围 + 标题 + 地点，按时间排序
 4. **新建日程 Modal**：标题、起止时间、地点、描述、提醒、重复规则
-5. **日程删除功能**
+5. **日程编辑功能**：点击编辑按钮，打开带现有数据的 Modal，修改后保存
+6. **日程删除功能**
 
 ---
 
@@ -169,11 +170,13 @@ pub struct ScheduleTabState {
     pub schedules: Vec<Schedule>,
     pub form: ScheduleForm,
     pub show_form: bool,
+    pub editing_id: Option<Uuid>,
 }
 
 impl ScheduleTabState {
     pub fn new() -> Self
     pub fn reset_form(&mut self)
+    pub fn load_for_edit(&mut self, schedule: &Schedule)
     pub fn validate_form(&self) -> Result<Schedule>
 }
 ```
@@ -204,6 +207,10 @@ enum Message {
     ScheduleFormReminderChanged(String),
     ScheduleFormRruleChanged(RecurrenceRule),
 
+    // 日程编辑
+    ScheduleEditOpen(Uuid),
+    ScheduleEditConfirm,
+
     // 日程操作
     ScheduleDelete(Uuid),
 }
@@ -223,13 +230,13 @@ enum Message {
 │ ┌─────────────────────────────────────────────────────────┐│
 │ │                                                         ││
 │ │  06/01 (一)  14:00 - 15:00  复习英语单词                  ││
-│ │  地点: 图书馆                               [删除]      ││
+│ │  地点: 图书馆                     [编辑] [删除]          ││
 │ │                                                         ││
 │ │  06/02 (二)  09:00 - 10:30  数学期中考试                  ││
-│ │  地点: 教学楼                               [删除]      ││
+│ │  地点: 教学楼                     [编辑] [删除]          ││
 │ │                                                         ││
 │ │  06/03 (三)  19:00 - 20:00  Rust 学习小组                ││
-│ │  地点: 线上                                 [删除]      ││
+│ │  地点: 线上                       [编辑] [删除]          ││
 │ │                                                         ││
 │ └─────────────────────────────────────────────────────────┘│
 │                                                             │
@@ -240,7 +247,7 @@ enum Message {
 - 日期 + 星期 + 时间范围（主行）
 - 标题（主行粗体）
 - 地点（次行，小号灰色）
-- 删除按钮（右对齐）
+- 操作按钮：编辑 / 删除（右对齐）
 
 **排序规则**：按 DTSTART 升序排列。
 
@@ -307,7 +314,26 @@ enum Message {
   → Moda 关闭，列表更新
 ```
 
-### 6.2 删除日程流程
+### 6.2 编辑日程流程
+
+```
+用户点击 [编辑] → ScheduleEditOpen(id)
+  → 查询 ScheduleTabState.schedules 中对应 Schedule
+  → 将现有字段填入 ScheduleTabState.form
+  → 显示 Modal（数据已预填）
+
+用户修改字段 → ScheduleForm*Changed 消息
+  → ScheduleTabState.form 各字段更新
+
+用户点击 [创建/保存] → ScheduleEditConfirm
+  → 验证表单完整性
+  → ScheduleTabState.validate_form() 返回更新后的 Schedule
+  → DataFs.save_schedule(&schedule)
+  → DataFs.list_schedules() → 刷新列表
+  → Modal 关闭，列表更新
+```
+
+### 6.3 删除日程流程
 
 ```
 用户点击 [删除] → ScheduleDelete(id)
@@ -316,7 +342,7 @@ enum Message {
   → 列表即时更新
 ```
 
-### 6.3 数据加载流程
+### 6.4 数据加载流程
 
 ```
 App 启动 / 刷新
@@ -353,6 +379,7 @@ App 启动 / 刷新
 ### 8.2 集成测试
 
 - 新建日程 → 列表显示 → 内容正确
+- 编辑日程 → 修改字段 → 保存后列表更新
 - 删除日程 → 列表移除 → 文件删除
 - 多个日程按时间排序
 
