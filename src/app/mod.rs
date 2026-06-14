@@ -359,6 +359,55 @@ impl App {
                 Task::none()
             }
 
+            Message::SettingsFormDataDirChanged(val) => {
+                self.settings_tab.form_data_dir = val;
+                Task::none()
+            }
+
+            Message::SettingsFormDefaultPresetChanged(val) => {
+                self.settings_tab.form_default_preset = val;
+                Task::none()
+            }
+
+            Message::SettingsFormSaveRequested => {
+                let data_dir_val = self.settings_tab.form_data_dir.trim().to_string();
+                let default_preset_val = self.settings_tab.form_default_preset.trim().to_string();
+
+                let new_config = crate::data::config::Config {
+                    data_dir: if data_dir_val.is_empty() { None } else { Some(data_dir_val.clone()) },
+                    default_preset: if default_preset_val.is_empty() { None } else { Some(default_preset_val.clone()) },
+                };
+
+                let path = self.settings_tab.config_path.clone();
+                let data_dir_changed = data_dir_val != self.settings_tab.config.data_dir.as_deref().unwrap_or("");
+
+                match new_config.save(&path) {
+                    Ok(()) => {
+                        self.settings_tab.config = new_config;
+                        if !default_preset_val.is_empty() {
+                            self.default_preset = default_preset_val;
+                        }
+                        let msg = if data_dir_changed {
+                            "配置已保存，数据目录修改需重启生效".to_string()
+                        } else {
+                            "配置已保存".to_string()
+                        };
+                        self.settings_tab.message = Some(msg);
+                        self.settings_tab.message_is_error = false;
+                    }
+                    Err(e) => {
+                        self.settings_tab.message = Some(format!("保存失败: {}", e));
+                        self.settings_tab.message_is_error = true;
+                    }
+                }
+                Task::none()
+            }
+
+            Message::SettingsFormDismissMessage => {
+                self.settings_tab.dismiss_message();
+                Task::none()
+            }
+
             Message::CardSelected(path) => {
                 self.category_tab.selected_path = Some(path.clone());
                 Task::none()
