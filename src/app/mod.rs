@@ -72,6 +72,7 @@ impl App {
                 let timer_manager = TimerManager::new(data_dir.clone());
                 let data_fs_arc = Arc::new(data_fs);
                 
+                let timer_tab = TimerTabState::new(timer_manager.get_state().clone(), &default_preset);
                 let state = App {
                     default_preset,
                     active_tab: TabId::Category,
@@ -80,7 +81,7 @@ impl App {
                     
                     category_tab: CategoryTabState::default(),
                     review_tab: ReviewTabState::default(),
-                    timer_tab: TimerTabState::new(timer_manager.get_state().clone()),
+                    timer_tab,
                     schedule_tab: ScheduleTabState::default(),
                     todo_tab: TodoTabState::default(),
                     preset_tab: PresetTabState::default(),
@@ -404,7 +405,7 @@ impl App {
             
             Message::NewNodeOpen(default_type) => {
                 if let Some(ref path) = self.category_tab.selected_path {
-                    let form = category_tab::NewNodeForm::new(path.clone(), default_type);
+                    let form = category_tab::NewNodeForm::new(path.clone(), default_type, &self.default_preset);
                     self.category_tab.new_node_form = Some(form);
                     self.modal = Some(Modal::NewNode);
                 }
@@ -725,6 +726,7 @@ impl App {
                 use crate::fsrs::FsrsPredictor;
                 
                 let data_fs = Arc::new(self.data_fs.clone());
+                let default_preset = self.default_preset.clone();
                 return Task::future(async move {
                     let predictor = FsrsPredictor::new().expect("Failed to create FSRS predictor");
                     let trees = data_fs.list_trees().unwrap_or_default();
@@ -746,7 +748,7 @@ impl App {
                                         algorithm: "fsrs".to_string(),
                                         next_review,
                                         fsrs_state_bytes: crate::fsrs::FsrsPredictor::memory_state_to_bytes(&new_state),
-                                        preset_used: "default".to_string(),
+                                        preset_used: default_preset.clone(),
                                     });
                                     let _ = data_fs.save_card(&path, &card);
                                 }
@@ -881,7 +883,7 @@ impl App {
                                     algorithm: "fsrs".to_string(),
                                     next_review,
                                     fsrs_state_bytes: crate::fsrs::FsrsPredictor::memory_state_to_bytes(&new_state),
-                                    preset_used: "default".to_string(),
+                                    preset_used: self.default_preset.clone(),
                                 });
                             }
                         }

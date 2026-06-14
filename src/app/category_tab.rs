@@ -21,12 +21,12 @@ pub struct NewNodeForm {
 }
 
 impl NewNodeForm {
-    pub fn new(parent_path: String, default_type: NodeType) -> Self {
+    pub fn new(parent_path: String, default_type: NodeType, default_preset: &str) -> Self {
         Self {
             parent_path,
             node_type: default_type,
             name: String::new(),
-            preset: "default".to_string(),
+            preset: default_preset.to_string(),
         }
     }
 }

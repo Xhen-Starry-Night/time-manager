@@ -32,7 +32,7 @@ pub struct TimerRecord {
 }
 
 impl TimerTabState {
-    pub fn new(state: TimerState) -> Self {
+    pub fn new(state: TimerState, default_preset: &str) -> Self {
         Self {
             state,
             elapsed_ms: 0,
@@ -44,7 +44,7 @@ impl TimerTabState {
             timer_history: Vec::new(),
             current_card: None,
             new_card_name: String::new(),
-            new_card_preset: "default".to_string(),
+            new_card_preset: default_preset.to_string(),
             new_card_type: NodeType::Card,
         }
     }
@@ -52,6 +52,6 @@ impl TimerTabState {
 
 impl Default for TimerTabState {
     fn default() -> Self {
-        Self::new(TimerState::default())
+        Self::new(TimerState::default(), "default")
     }
 }
