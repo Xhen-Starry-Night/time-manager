@@ -436,3 +436,40 @@ fn test_parse_invalid_ics() {
     assert!(parse_ics("BEGIN:VCALENDAR\nEND:VCALENDAR").is_err());
     assert!(parse_ics("INVALID").is_err());
 }
+
+#[test]
+fn test_config_load_save() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = dir.path().join("config.toml");
+
+    let config = time_manager::data::config::Config {
+        data_dir: Some("/tmp/data".to_string()),
+        default_preset: Some("english".to_string()),
+    };
+    config.save(&config_path).unwrap();
+
+    let loaded = time_manager::data::config::Config::load(&config_path).unwrap();
+    assert_eq!(loaded.data_dir, Some("/tmp/data".to_string()));
+    assert_eq!(loaded.default_preset, Some("english".to_string()));
+}
+
+#[test]
+fn test_config_partial() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = dir.path().join("config.toml");
+
+    std::fs::write(&config_path, "default_preset = \"math\"").unwrap();
+    let loaded = time_manager::data::config::Config::load(&config_path).unwrap();
+    assert!(loaded.data_dir.is_none());
+    assert_eq!(loaded.default_preset, Some("math".to_string()));
+}
+
+#[test]
+fn test_config_not_found() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = dir.path().join("nonexistent.toml");
+
+    let loaded = time_manager::data::config::Config::load(&config_path).unwrap();
+    assert!(loaded.data_dir.is_none());
+    assert!(loaded.default_preset.is_none());
+}
