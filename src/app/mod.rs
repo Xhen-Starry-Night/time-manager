@@ -1434,10 +1434,8 @@ impl App {
                     build_link_timer_modal(
                         duration_ms,
                         card_path,
-                        card_dropdown,
                         selected_card,
                         memory_quality,
-                        show_new_card_form,
                         new_card_name,
                         new_card_preset,
                         tree_view,
@@ -2210,10 +2208,8 @@ fn review_card_item(card_name: String, path: String, urgency: i32, is_selected: 
 fn build_link_timer_modal(
     duration_ms: i64,
     card_path: String,
-    card_dropdown: Vec<String>,
     selected_card: Option<String>,
     memory_quality: crate::data::models::MemoryQuality,
-    show_new_card_form: bool,
     new_card_name: String,
     new_card_preset: String,
     tree_view: &crate::gui::components::TreeView,
@@ -2268,35 +2264,23 @@ fn build_link_timer_modal(
             // 树形选择器
             tree_picker,
             
-            // 连接到新卡片（在已选路径下创建）
-            button(text("连接到新卡片..."))
-                .on_press(Message::TimerCreateNewCard),
+            // 创建新卡片（常态显示）
+            text("创建新卡片:").color(Color::WHITE).size(14),
             
-            // 新卡片输入表单
-            if show_new_card_form {
-                let new_card_form: Element<Message> = column![
-                    Space::new().height(8),
-                    row![
-                        text("名称:").color(Color::WHITE),
-                        text_input("输入卡片名称...", &new_card_name)
-                            .on_input(Message::TimerNewCardNameChanged),
-                    ]
-                    .spacing(8),
-                    row![
-                        text("预设:").color(Color::WHITE),
-                        text_input("default", &new_card_preset)
-                            .on_input(Message::TimerNewCardPresetChanged),
-                    ]
-                    .spacing(8),
-                    button(text("创建").color(Color::WHITE))
-                        .on_press(Message::TimerNewCardConfirm),
-                ]
-                .spacing(8)
-                .into();
-                new_card_form
-            } else {
-                Space::new().height(0).into()
-            },
+            row![
+                text("名称:").color(Color::WHITE),
+                text_input("输入卡片名称...", &new_card_name)
+                    .on_input(Message::TimerNewCardNameChanged),
+            ]
+            .spacing(8),
+            row![
+                text("预设:").color(Color::WHITE),
+                text_input("default", &new_card_preset)
+                    .on_input(Message::TimerNewCardPresetChanged),
+            ]
+            .spacing(8),
+            button(text("创建").color(Color::WHITE))
+                .on_press(Message::TimerNewCardConfirm),
             
             Space::new().height(16),
             
