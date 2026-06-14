@@ -129,6 +129,11 @@ pub enum Message {
     PresetDeleteConfirmed(String),
     PresetDeleteDismissed,
 
+    SettingsFormDataDirChanged(String),
+    SettingsFormDefaultPresetChanged(String),
+    SettingsFormSaveRequested,
+    SettingsFormDismissMessage,
+
     Error(String),
     ClearError,
 }
