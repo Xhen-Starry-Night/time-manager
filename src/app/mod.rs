@@ -6,6 +6,7 @@ use iced::widget::{button, column, row, text, container, rule, text_input, pick_
 use iced::Length;
 use chrono::{Datelike, Utc};
 
+use crate::data::config::Config;
 use crate::data::DataFs;
 use crate::data::models::{Card, Preset, Todo};
 use crate::gui::{Message, TabId, Modal, DataSnapshot, NodeType};
@@ -74,7 +75,11 @@ impl App {
                     schedule_tab: ScheduleTabState::default(),
                     todo_tab: TodoTabState::default(),
                     preset_tab: PresetTabState::default(),
-                    settings_tab: SettingsTabState::new(data_dir.clone()),
+                    settings_tab: SettingsTabState::new(
+                        Config::config_dir(),
+                        Config::config_path(),
+                        Config::default(),
+                    ),
                     
                     timer_manager,
                     error_message: None,
@@ -2226,7 +2231,7 @@ impl App {
                         rule::horizontal(1.0),
                         row![
                             text("数据目录:").color(iced::Color::WHITE),
-                            text(self.settings_tab.data_dir.to_string_lossy().to_string())
+                            text(&self.settings_tab.form_data_dir)
                                 .color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
                         ]
                         .spacing(8)
