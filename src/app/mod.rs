@@ -2285,26 +2285,61 @@ impl App {
                     .into()
             }
             TabId::Settings => {
-                container(
-                    column![
-                        text("设置").size(20).color(iced::Color::WHITE),
-                        rule::horizontal(1.0),
-                        row![
-                            text("数据目录:").color(iced::Color::WHITE),
-                            text(&self.settings_tab.form_data_dir)
-                                .color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
-                        ]
-                        .spacing(8)
-                        .padding(16),
-                    ]
-                )
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .style(|_: &iced::Theme| iced::widget::container::Style {
-                    background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
-                    ..Default::default()
-                })
-                .into()
+                let mut col = column![
+                    text("设置").size(20).color(iced::Color::WHITE),
+                    rule::horizontal(1.0),
+                    row![
+                        text("配置目录:").color(iced::Color::WHITE),
+                        text(self.settings_tab.config_dir.to_string_lossy().to_string())
+                            .color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                    ].spacing(8).padding(8),
+                    row![
+                        text("数据目录:").color(iced::Color::WHITE),
+                        iced::widget::text_input("数据目录路径", &self.settings_tab.form_data_dir)
+                            .on_input(Message::SettingsFormDataDirChanged),
+                    ].spacing(8).padding(8),
+                    row![
+                        text("默认预设:").color(iced::Color::WHITE),
+                        {
+                            let presets: Vec<String> = self.preset_tab.presets.iter()
+                                .map(|p| p.name.clone())
+                                .collect();
+                            iced::widget::pick_list(
+                                presets,
+                                Some(self.settings_tab.form_default_preset.clone()),
+                                Message::SettingsFormDefaultPresetChanged,
+                            )
+                        },
+                    ].spacing(8).padding(8),
+                    iced::widget::button(iced::widget::text("保存"))
+                        .on_press(Message::SettingsFormSaveRequested)
+                        .padding(8),
+                ]
+                .spacing(4);
+
+                if let Some(ref msg) = self.settings_tab.message {
+                    let color = if self.settings_tab.message_is_error {
+                        iced::Color::from_rgb(1.0, 0.3, 0.3)
+                    } else {
+                        iced::Color::from_rgb(0.3, 1.0, 0.3)
+                    };
+                    let msg_row = row![
+                        text(msg.clone()).color(color),
+                        iced::widget::button(iced::widget::text("×").size(12))
+                            .style(iced::widget::button::text)
+                            .on_press(Message::SettingsFormDismissMessage),
+                    ].spacing(8).padding(8);
+                    col = col.push(msg_row);
+                }
+
+                container(col)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .style(|_: &iced::Theme| iced::widget::container::Style {
+                        background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
+                        ..Default::default()
+                    })
+                    .into()
             }
             _ => {
                 container(
