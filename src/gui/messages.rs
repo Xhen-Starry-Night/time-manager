@@ -115,7 +115,18 @@ pub enum Message {
     ScheduleFormLocationChanged(String),
     ScheduleFormReminderChanged(String),
     ScheduleFormRruleChanged(crate::data::models::RecurrenceRule),
-    
+
+    PresetCreateOpen,
+    PresetEditOpen(String),
+    PresetFormDismissed,
+    PresetFormNameChanged(String),
+    PresetFormDescriptionChanged(String),
+    PresetFormMatchRulesChanged(String),
+    PresetFormSaveRequested,
+    PresetDeleteRequested(String),
+    PresetDeleteConfirmed(String),
+    PresetDeleteDismissed,
+
     Error(String),
     ClearError,
 }
