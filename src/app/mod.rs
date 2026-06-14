@@ -4,7 +4,7 @@ use std::sync::Arc;
 use iced::{application, Element, Task};
 use iced::widget::{button, column, row, text, container, rule, text_input, pick_list, Space};
 use iced::Length;
-use chrono::Utc;
+use chrono::{Datelike, Utc};
 
 use crate::data::DataFs;
 use crate::data::models::{Card, Todo};
@@ -1056,6 +1056,126 @@ impl App {
                 Task::none()
             }
             
+            Message::ScheduleCreateOpen => {
+                self.schedule_tab.form.reset();
+                self.schedule_tab.editing_id = None;
+                self.schedule_tab.show_form = true;
+                self.schedule_tab.form_error = None;
+                self.modal = Some(Modal::NewSchedule);
+                Task::none()
+            }
+
+            Message::ScheduleCreateConfirm => {
+                match self.schedule_tab.form.validate() {
+                    Ok(schedule) => {
+                        match self.data_fs.save_schedule(&schedule) {
+                            Ok(()) => {
+                                self.schedule_tab.show_form = false;
+                                self.modal = None;
+                                self.schedule_tab.schedules = self.data_fs.list_schedules().unwrap_or_default();
+                            }
+                            Err(e) => {
+                                self.schedule_tab.form_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        self.schedule_tab.form_error = Some(e);
+                    }
+                }
+                Task::none()
+            }
+
+            Message::ScheduleEditOpen(id) => {
+                if let Some(schedule) = self.schedule_tab.schedules.iter().find(|s| s.id == id) {
+                    self.schedule_tab.form.load_from_schedule(schedule);
+                    self.schedule_tab.editing_id = Some(id);
+                    self.schedule_tab.show_form = true;
+                    self.schedule_tab.form_error = None;
+                    self.modal = Some(Modal::NewSchedule);
+                }
+                Task::none()
+            }
+
+            Message::ScheduleEditConfirm => {
+                match self.schedule_tab.form.validate() {
+                    Ok(mut schedule) => {
+                        if let Some(editing_id) = self.schedule_tab.editing_id {
+                            schedule.id = editing_id;
+                        }
+                        match self.data_fs.save_schedule(&schedule) {
+                            Ok(()) => {
+                                self.schedule_tab.show_form = false;
+                                self.modal = None;
+                                self.schedule_tab.editing_id = None;
+                                self.schedule_tab.schedules = self.data_fs.list_schedules().unwrap_or_default();
+                            }
+                            Err(e) => {
+                                self.schedule_tab.form_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        self.schedule_tab.form_error = Some(e);
+                    }
+                }
+                Task::none()
+            }
+
+            Message::ScheduleDelete(id) => {
+                match self.data_fs.delete_schedule(&id) {
+                    Ok(()) => {
+                        self.schedule_tab.schedules.retain(|s| s.id != id);
+                    }
+                    Err(e) => {
+                        self.error_message = Some(e.to_string());
+                    }
+                }
+                Task::none()
+            }
+
+            Message::ScheduleFormSummaryChanged(val) => {
+                self.schedule_tab.form.summary = val;
+                self.schedule_tab.form_error = None;
+                Task::none()
+            }
+            Message::ScheduleFormStartDateChanged(val) => {
+                self.schedule_tab.form.start_date = val;
+                self.schedule_tab.form_error = None;
+                Task::none()
+            }
+            Message::ScheduleFormStartTimeChanged(val) => {
+                self.schedule_tab.form.start_time = val;
+                self.schedule_tab.form_error = None;
+                Task::none()
+            }
+            Message::ScheduleFormEndDateChanged(val) => {
+                self.schedule_tab.form.end_date = val;
+                self.schedule_tab.form_error = None;
+                Task::none()
+            }
+            Message::ScheduleFormEndTimeChanged(val) => {
+                self.schedule_tab.form.end_time = val;
+                self.schedule_tab.form_error = None;
+                Task::none()
+            }
+            Message::ScheduleFormDescriptionChanged(val) => {
+                self.schedule_tab.form.description = val;
+                Task::none()
+            }
+            Message::ScheduleFormLocationChanged(val) => {
+                self.schedule_tab.form.location = val;
+                Task::none()
+            }
+            Message::ScheduleFormReminderChanged(val) => {
+                self.schedule_tab.form.reminder = val;
+                Task::none()
+            }
+            Message::ScheduleFormRruleChanged(val) => {
+                self.schedule_tab.form.rrule = val;
+                Task::none()
+            }
+            
             _ => Task::none(),
         }
     }
@@ -1346,8 +1466,9 @@ impl App {
                         .spacing(1)
                         .width(Length::Fill)
                         .height(Length::Fill)
-                        .into()
-                }
+    .into()
+}
+
             }
             TabId::Review => {
                 use crate::fsrs::FsrsPredictor;
@@ -1717,7 +1838,22 @@ impl App {
                 .into()
             }
             TabId::Schedule => {
-                let schedule_list = if self.schedule_tab.schedules.is_empty() {
+                let add_button = button(text("新建日程").color(iced::Color::WHITE))
+                    .on_press(Message::ScheduleCreateOpen)
+                    .style(|_, _| iced::widget::button::Style {
+                        background: Some(iced::Color::from_rgb(0.2, 0.6, 0.86).into()),
+                        text_color: iced::Color::WHITE,
+                        ..Default::default()
+                    });
+
+                let header = row![
+                    text("日程").size(20).color(iced::Color::WHITE),
+                    Space::new().width(Length::Fill),
+                    add_button,
+                ]
+                .padding(8);
+
+                let schedule_list: Element<Message> = if self.schedule_tab.schedules.is_empty() {
                     container(
                         text("暂无日程安排")
                             .size(16)
@@ -1727,38 +1863,83 @@ impl App {
                     .height(Length::Fill)
                     .center_x(Length::Fill)
                     .center_y(Length::Fill)
+                    .into()
                 } else {
-                    container(
-                        scrollable(
-                            column(
-                                self.schedule_tab.schedules.iter().map(|schedule| {
-                                    let time_str = format!("{} - {}",
-                                        schedule.dtstart.format("%m/%d %H:%M"),
-                                        schedule.dtend.format("%H:%M"));
+                    scrollable(
+                        column(
+                            self.schedule_tab.schedules.iter().map(|schedule| {
+                                let weekday = weekday_cn(schedule.dtstart.weekday().num_days_from_monday());
+                                let start_str = format!("{}/{} ({})",
+                                    schedule.dtstart.format("%m").to_string(),
+                                    schedule.dtstart.format("%d").to_string(),
+                                    weekday);
+                                let time_range = format!("{} - {}",
+                                    schedule.dtstart.format("%H:%M"),
+                                    schedule.dtend.format("%H:%M"));
 
+                                let edit_btn = button(text("编辑").color(iced::Color::from_rgb(0.4, 0.7, 0.9)))
+                                    .on_press(Message::ScheduleEditOpen(schedule.id))
+                                    .style(|_, _| iced::widget::button::Style {
+                                        background: Some(iced::Color::from_rgb(0.25, 0.25, 0.25).into()),
+                                        text_color: iced::Color::from_rgb(0.4, 0.7, 0.9),
+                                        ..Default::default()
+                                    });
+
+                                let delete_btn = button(text("删除").color(iced::Color::from_rgb(0.9, 0.3, 0.2)))
+                                    .on_press(Message::ScheduleDelete(schedule.id))
+                                    .style(|_, _| iced::widget::button::Style {
+                                        background: Some(iced::Color::from_rgb(0.25, 0.25, 0.25).into()),
+                                        text_color: iced::Color::from_rgb(0.9, 0.3, 0.2),
+                                        ..Default::default()
+                                    });
+
+                                let location_text = schedule.location.as_ref()
+                                    .map(|loc| format!("地点: {}", loc))
+                                    .unwrap_or_default();
+
+                                container(
                                     row![
-                                        text(time_str).color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
-                                        text(&schedule.summary).color(iced::Color::WHITE),
+                                        column![
+                                            row![
+                                                text(start_str).color(iced::Color::from_rgb(0.7, 0.7, 0.7)).size(13),
+                                                Space::new().width(Length::Fixed(8.0)),
+                                                text(time_range).color(iced::Color::from_rgb(0.6, 0.6, 0.6)).size(13),
+                                                Space::new().width(Length::Fixed(8.0)),
+                                                text(&schedule.summary).color(iced::Color::WHITE).size(14),
+                                            ],
+                                            {
+                                                let loc_elem: Element<Message> = if !location_text.is_empty() {
+                                                    text(location_text).color(iced::Color::from_rgb(0.5, 0.5, 0.5)).size(12).into()
+                                                } else {
+                                                    row![].into()
+                                                };
+                                                loc_elem
+                                            },
+                                        ]
+                                        .spacing(2),
+                                        Space::new().width(Length::Fill),
+                                        edit_btn,
+                                        delete_btn,
                                     ]
-                                    .spacing(12)
+                                    .spacing(8)
                                     .padding(8)
-                                    .width(Length::Fill)
-                                    .into()
+                                )
+                                .style(|_| iced::widget::container::Style {
+                                    background: Some(iced::Color::from_rgb(0.22, 0.22, 0.22).into()),
+                                    ..Default::default()
                                 })
-                            )
-                            .spacing(8)
+                                .width(Length::Fill)
+                                .into()
+                            })
                         )
+                        .spacing(4)
                     )
-                    .width(Length::Fill)
-                    .height(Length::Fill)
+                    .into()
                 };
-                
+
                 container(
                     column![
-                        row![
-                            container(text("日程").size(20).color(iced::Color::WHITE))
-                                .padding(8),
-                        ],
+                        header,
                         rule::horizontal(1.0),
                         schedule_list,
                     ]
@@ -1858,6 +2039,7 @@ impl App {
             let modal_title = match modal {
                 Modal::NewTodo => "新建待办",
                 Modal::EditTodo { .. } => "编辑待办",
+                Modal::NewSchedule => "新建日程",
                 Modal::NewNode => "新建节点",
                 Modal::EditCard { .. } => "编辑卡片",
                 Modal::ConfirmDelete { .. } => "确认删除",
@@ -1922,6 +2104,81 @@ impl App {
                         (Message::ModalClose, "关闭", false),
                     )
                 }
+                Modal::NewSchedule => {
+                    use crate::data::models::RecurrenceRule;
+                    let form = &self.schedule_tab.form;
+                    let rrule_options = vec!["无".to_string(), "每天".to_string(), "每周".to_string(), "每月".to_string()];
+
+                    let content = column![
+                        row![
+                            text("标题:").color(iced::Color::WHITE),
+                            text_input("日程标题", &form.summary)
+                                .on_input(Message::ScheduleFormSummaryChanged)
+                                .width(Length::Fill),
+                        ].spacing(8).padding(4),
+                        row![
+                            text("开始:").color(iced::Color::WHITE),
+                            text_input("日期", &form.start_date)
+                                .on_input(Message::ScheduleFormStartDateChanged)
+                                .width(Length::Fixed(120.0)),
+                            Space::new().width(Length::Fixed(8.0)),
+                            text_input("时间", &form.start_time)
+                                .on_input(Message::ScheduleFormStartTimeChanged)
+                                .width(Length::Fixed(80.0)),
+                        ].spacing(8).padding(4),
+                        row![
+                            text("结束:").color(iced::Color::WHITE),
+                            text_input("日期", &form.end_date)
+                                .on_input(Message::ScheduleFormEndDateChanged)
+                                .width(Length::Fixed(120.0)),
+                            Space::new().width(Length::Fixed(8.0)),
+                            text_input("时间", &form.end_time)
+                                .on_input(Message::ScheduleFormEndTimeChanged)
+                                .width(Length::Fixed(80.0)),
+                        ].spacing(8).padding(4),
+                        row![
+                            text("地点:").color(iced::Color::WHITE),
+                            text_input("可选", &form.location)
+                                .on_input(Message::ScheduleFormLocationChanged)
+                                .width(Length::Fill),
+                        ].spacing(8).padding(4),
+                        row![
+                            text("描述:").color(iced::Color::WHITE),
+                            text_input("可选", &form.description)
+                                .on_input(Message::ScheduleFormDescriptionChanged)
+                                .width(Length::Fill),
+                        ].spacing(8).padding(4),
+                        row![
+                            text("提醒:").color(iced::Color::WHITE),
+                            text_input("分钟前", &form.reminder)
+                                .on_input(Message::ScheduleFormReminderChanged)
+                                .width(Length::Fixed(80.0)),
+                        ].spacing(8).padding(4),
+                        row![
+                            text("重复:").color(iced::Color::WHITE),
+                            pick_list(rrule_options, Some(form.rrule.as_str().to_string()), move |s| {
+                                Message::ScheduleFormRruleChanged(RecurrenceRule::from_str(&s))
+                            }).width(Length::Fixed(100.0)),
+                        ].spacing(8).padding(4),
+                        {
+                            let err_elem: Element<Message> = if let Some(ref err) = self.schedule_tab.form_error {
+                                text(err.clone()).color(iced::Color::from_rgb(0.9, 0.3, 0.2)).size(13).into()
+                            } else {
+                                row![].into()
+                            };
+                            err_elem
+                        },
+                    ].spacing(4).padding(8);
+
+                    let confirm_msg = if self.schedule_tab.editing_id.is_some() {
+                        Message::ScheduleEditConfirm
+                    } else {
+                        Message::ScheduleCreateConfirm
+                    };
+
+                    (content.into(), (confirm_msg, "保存", true))
+                }
+
                 Modal::NewNode => {
                     if let Some(ref form) = self.category_tab.new_node_form {
                         let presets: Vec<String> = self.preset_tab.presets.iter()
@@ -2502,4 +2759,17 @@ fn review_detail_panel(path: &str, card: &Card, stats: &review_tab::CardStats) -
         ..Default::default()
     })
     .into()
+}
+
+fn weekday_cn(days_from_monday: u32) -> &'static str {
+    match days_from_monday {
+        0 => "一",
+        1 => "二",
+        2 => "三",
+        3 => "四",
+        4 => "五",
+        5 => "六",
+        6 => "日",
+        _ => "",
+    }
 }
