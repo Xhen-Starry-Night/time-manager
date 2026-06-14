@@ -37,6 +37,12 @@ pub enum DataError {
 
     #[error("invalid data: {0}")]
     InvalidData(String),
+
+    #[error("config parse error: {0}")]
+    ConfigParse(String),
+
+    #[error("config serialize error: {0}")]
+    ConfigSerialize(String),
 }
 
 impl From<std::io::Error> for DataError {
