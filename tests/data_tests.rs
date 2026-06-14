@@ -163,6 +163,78 @@ fn test_preset_not_found() {
 }
 
 #[test]
+fn test_delete_preset() {
+    let dir = tempdir().unwrap();
+    let fs = DataFs::init(dir.path().to_path_buf()).unwrap();
+
+    let preset = Preset {
+        name: "to_delete".to_string(),
+        description: None,
+        match_rules: vec![],
+        fsrs_parameters: None,
+        trained_at: None,
+    };
+
+    fs.save_preset(&preset).unwrap();
+    assert!(fs.get_preset("to_delete").is_ok());
+
+    fs.delete_preset("to_delete").unwrap();
+    assert!(fs.get_preset("to_delete").is_err());
+}
+
+#[test]
+fn test_rename_preset() {
+    let dir = tempdir().unwrap();
+    let fs = DataFs::init(dir.path().to_path_buf()).unwrap();
+
+    let preset = Preset {
+        name: "old_name".to_string(),
+        description: Some("test".to_string()),
+        match_rules: vec!["study/*".to_string()],
+        fsrs_parameters: None,
+        trained_at: None,
+    };
+
+    fs.save_preset(&preset).unwrap();
+    fs.rename_preset("old_name", "new_name").unwrap();
+
+    assert!(fs.get_preset("old_name").is_err());
+    let renamed = fs.get_preset("new_name").unwrap();
+    assert_eq!(renamed.name, "new_name");
+    assert_eq!(renamed.description, Some("test".to_string()));
+    assert_eq!(renamed.match_rules, vec!["study/*".to_string()]);
+}
+
+#[test]
+fn test_preset_crud_workflow() {
+    let dir = tempdir().unwrap();
+    let fs = DataFs::init(dir.path().to_path_buf()).unwrap();
+
+    // create
+    let p1 = Preset {
+        name: "english".to_string(),
+        description: Some("英语高频词".to_string()),
+        match_rules: vec!["main/english/**".to_string()],
+        fsrs_parameters: None,
+        trained_at: None,
+    };
+    fs.save_preset(&p1).unwrap();
+    let presets = fs.list_presets().unwrap();
+    assert!(presets.iter().any(|p| p.name == "english"));
+
+    // rename
+    fs.rename_preset("english", "english-v2").unwrap();
+    let presets = fs.list_presets().unwrap();
+    assert!(presets.iter().any(|p| p.name == "english-v2"));
+    assert!(!presets.iter().any(|p| p.name == "english"));
+
+    // delete
+    fs.delete_preset("english-v2").unwrap();
+    let presets = fs.list_presets().unwrap();
+    assert!(!presets.iter().any(|p| p.name == "english-v2"));
+}
+
+#[test]
 fn test_todo_crud() {
     let dir = tempdir().unwrap();
     let fs = DataFs::init(dir.path().to_path_buf()).unwrap();
