@@ -101,6 +101,21 @@ pub enum Message {
     StartReviewTimer(String),
     RefreshPredictions,
     
+    ScheduleCreateOpen,
+    ScheduleCreateConfirm,
+    ScheduleEditOpen(Uuid),
+    ScheduleEditConfirm,
+    ScheduleDelete(Uuid),
+    ScheduleFormSummaryChanged(String),
+    ScheduleFormStartDateChanged(String),
+    ScheduleFormStartTimeChanged(String),
+    ScheduleFormEndDateChanged(String),
+    ScheduleFormEndTimeChanged(String),
+    ScheduleFormDescriptionChanged(String),
+    ScheduleFormLocationChanged(String),
+    ScheduleFormReminderChanged(String),
+    ScheduleFormRruleChanged(crate::data::models::RecurrenceRule),
+    
     Error(String),
     ClearError,
 }
