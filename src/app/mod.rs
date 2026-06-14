@@ -89,6 +89,7 @@ impl App {
                         Config::config_dir(),
                         Config::config_path(),
                         config,
+                        &data_dir.to_string_lossy(),
                     ),
                     
                     timer_manager,
@@ -379,7 +380,7 @@ impl App {
                 };
 
                 let path = self.settings_tab.config_path.clone();
-                let data_dir_changed = data_dir_val != self.settings_tab.config.data_dir.as_deref().unwrap_or("");
+                let data_dir_changed = data_dir_val != self.data_dir.to_string_lossy();
 
                 match new_config.save(&path) {
                     Ok(()) => {
