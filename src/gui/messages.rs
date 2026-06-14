@@ -34,6 +34,7 @@ pub enum Message {
     TimerCreateNewCard,
     TimerNewCardNameChanged(String),
     TimerNewCardPresetChanged(String),
+    TimerNewCardTypeChanged(NodeType),
     TimerNewCardConfirm,
     
     TimerHistoryLoad,

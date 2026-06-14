@@ -1,17 +1,15 @@
 use std::path::PathBuf;
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use iced::{application, Element, Task};
-use iced::widget::{button, column, row, text, container, rule, scrollable, text_input, pick_list, Space};
+use iced::widget::{button, column, row, text, container, rule, text_input, pick_list, Space};
 use iced::Length;
-use uuid::Uuid;
 use chrono::Utc;
 
 use crate::data::DataFs;
 use crate::data::models::{Card, Todo};
 use crate::gui::{Message, TabId, Modal, DataSnapshot, NodeType};
-use crate::gui::components::{tree_view::TreeNode, ModalView, NewTodoForm, NewNodeModal, TreeView};
+use crate::gui::components::{tree_view::TreeNode, ModalView, NewTodoForm, NewNodeModal};
 use crate::timer::TimerManager;
 
 pub mod category_tab;
@@ -147,6 +145,19 @@ impl App {
         
         search_recursive(&self.category_tab.tree_nodes, &query_lower, &mut results);
         results
+    }
+    
+    fn flatten_tree(node: &TreeNode) -> Vec<TreeNode> {
+        let mut result = vec![TreeNode {
+            name: node.name.clone(),
+            path: node.path.clone(),
+            is_card: node.is_card,
+            children: Vec::new(),
+        }];
+        for child in &node.children {
+            result.extend(Self::flatten_tree(child));
+        }
+        result
     }
     
     fn count_tree_children(&self, path: &str) -> usize {
@@ -672,6 +683,7 @@ impl App {
             
             Message::TimerLinkModeOpen => {
                 self.timer_tab.link_mode = true;
+                self.error_message = None;
                 Task::none()
             }
             
@@ -686,7 +698,8 @@ impl App {
             }
             
             Message::TimerCardSelected(path) => {
-                self.timer_tab.selected_card = Some(path);
+                self.timer_tab.selected_card = Some(path.clone());
+                self.timer_tab.card_path_input = path;
                 Task::none()
             }
             
@@ -752,29 +765,72 @@ impl App {
             
             Message::TimerNewCardNameChanged(name) => {
                 self.timer_tab.new_card_name = name;
+                self.error_message = None;
                 Task::none()
             }
             
             Message::TimerNewCardPresetChanged(preset) => {
                 self.timer_tab.new_card_preset = preset;
+                self.error_message = None;
+                Task::none()
+            }
+            
+            Message::TimerNewCardTypeChanged(node_type) => {
+                self.timer_tab.new_card_type = node_type;
+                self.error_message = None;
                 Task::none()
             }
             
             Message::TimerNewCardConfirm => {
                 if !self.timer_tab.new_card_name.is_empty() {
-                    let parent_path = self.timer_tab.card_path_input.clone();
-                    let card_name = self.timer_tab.new_card_name.clone();
+                    let input_path = self.timer_tab.card_path_input.clone();
+                    let node_name = self.timer_tab.new_card_name.clone();
+                    let node_type = self.timer_tab.new_card_type;
                     let preset = self.timer_tab.new_card_preset.clone();
-                    let new_path = if parent_path.is_empty() {
-                        card_name.clone()
+                    
+                    let is_card_path = self.category_tab.tree_nodes.iter()
+                        .flat_map(|n| Self::flatten_tree(n))
+                        .any(|n| n.path == input_path && n.is_card);
+                    
+                    let target_path = if input_path.is_empty() {
+                        node_name.clone()
+                    } else if is_card_path {
+                        let parent = input_path.rsplit_once('/')
+                            .map(|(p, _)| p.to_string())
+                            .unwrap_or_default();
+                        if parent.is_empty() {
+                            node_name.clone()
+                        } else {
+                            format!("{}/{}", parent, node_name)
+                        }
                     } else {
-                        format!("{}/{}", parent_path, card_name)
+                        format!("{}/{}", input_path, node_name)
                     };
                     
-                    let card = Card::new_with_preset(preset);
-                    if let Ok(()) = self.data_fs.save_card(&new_path, &card) {
-                        self.timer_tab.card_path_input = new_path;
+                    let result = match node_type {
+                        NodeType::Folder => self.data_fs.create_folder(&target_path),
+                        NodeType::Card => {
+                            let card = Card::new_with_preset(preset);
+                            self.data_fs.save_card(&target_path, &card)
+                        }
+                    };
+                    
+                    if result.is_ok() {
                         self.timer_tab.new_card_name.clear();
+                        
+                        if let Ok(trees) = self.data_fs.list_trees() {
+                            let mut all_cards = Vec::new();
+                            for tree in &trees {
+                                if let Ok(cards) = self.data_fs.list_cards(tree) {
+                                    all_cards.extend(cards);
+                                }
+                            }
+                            let new_nodes = self.build_tree_nodes(&trees, &all_cards);
+                            self.category_tab.tree_nodes = new_nodes.clone();
+                            self.category_tab.tree_view.expand_all(&new_nodes);
+                        }
+                    } else if let Err(e) = result {
+                        self.error_message = Some(e.to_string());
                     }
                 }
                 Task::none()
@@ -1425,6 +1481,8 @@ impl App {
                     let memory_quality = self.timer_tab.memory_quality.clone();
                     let new_card_name = self.timer_tab.new_card_name.clone();
                     let new_card_preset = self.timer_tab.new_card_preset.clone();
+                    let new_card_type = self.timer_tab.new_card_type;
+                    let error_message = self.error_message.clone();
                     let tree_nodes = &self.category_tab.tree_nodes;
                     let tree_view = &self.category_tab.tree_view;
                     
@@ -1435,6 +1493,8 @@ impl App {
                         memory_quality,
                         new_card_name,
                         new_card_preset,
+                        new_card_type,
+                        error_message,
                         tree_view,
                         tree_nodes,
                     )
@@ -2209,6 +2269,8 @@ fn build_link_timer_modal(
     memory_quality: crate::data::models::MemoryQuality,
     new_card_name: String,
     new_card_preset: String,
+    new_card_type: NodeType,
+    error_message: Option<String>,
     tree_view: &crate::gui::components::TreeView,
     tree_nodes: &[crate::gui::components::tree_view::TreeNode],
 ) -> Element<'static, Message> {
@@ -2243,69 +2305,84 @@ fn build_link_timer_modal(
     .padding(8)
     .into();
     
-    container(
-        column![
-            text(format!("学习时长: {}", duration_text))
-                .size(16)
-                .color(Color::WHITE),
-            
-            Space::new().height(16),
-            
-            // 卡片路径输入（手动输入或从树形选择）
-            row![
-                text("关联:").color(Color::WHITE),
-                text_input("输入卡片路径或从下方选择...", &card_path)
-                    .on_input(Message::TimerCardPathChanged),
-            ],
-            
-            // 树形选择器
-            tree_picker,
-            
-            // 创建新卡片（常态显示）
-            text("创建新卡片:").color(Color::WHITE).size(14),
-            
-            row![
-                text("名称:").color(Color::WHITE),
-                text_input("输入卡片名称...", &new_card_name)
-                    .on_input(Message::TimerNewCardNameChanged),
-            ]
-            .spacing(8),
-            row![
-                text("预设:").color(Color::WHITE),
-                text_input("default", &new_card_preset)
-                    .on_input(Message::TimerNewCardPresetChanged),
-            ]
-            .spacing(8),
-            button(text("创建").color(Color::WHITE))
-                .on_press(Message::TimerNewCardConfirm),
-            
-            Space::new().height(16),
-            
-            // 记忆质量选择
-            row![
-                text("记忆质量:").color(Color::WHITE),
-                MemoryQualitySelector::view(&memory_quality),
-            ],
-            
-            Space::new().height(24),
-            
-            // 按钮
-            row![
-                button(text("取消"))
-                    .on_press(Message::TimerLinkModeClose),
-                button(text("保存并预测"))
-                    .on_press(Message::TimerLinkConfirm),
-            ]
-            .spacing(12),
+    let type_options = vec![
+        (NodeType::Folder, "目录"),
+        (NodeType::Card, "学习卡片"),
+    ];
+    let type_labels: Vec<String> = type_options.iter().map(|(_, l)| l.to_string()).collect();
+    let current_type_label = type_options.iter()
+        .find(|(t, _)| *t == new_card_type)
+        .map(|(_, l)| l.to_string())
+        .unwrap_or_default();
+    
+    let mut col = column![]
+        .spacing(8);
+    
+    col = col
+        .push(text(format!("学习时长: {}", duration_text))
+            .size(16)
+            .color(Color::WHITE))
+        .push(Space::new().height(16))
+        .push(row![
+            text("关联:").color(Color::WHITE),
+            text_input("输入卡片路径或从下方选择...", &card_path)
+                .on_input(Message::TimerCardPathChanged),
+        ])
+        .push(tree_picker)
+        .push(text("创建:").color(Color::WHITE).size(14))
+        .push(row![
+            text("类型:").color(Color::WHITE),
+            pick_list(type_labels, Some(current_type_label), move |s| {
+                let t = if s == "目录" { NodeType::Folder } else { NodeType::Card };
+                Message::TimerNewCardTypeChanged(t)
+            }).width(Length::Fixed(150.0)),
         ]
-        .spacing(8)
-    )
-    .padding(24)
-    .style(|_| container::Style {
-        background: Some(Color::from_rgb(0.2, 0.2, 0.2).into()),
-        ..Default::default()
-    })
-    .into()
+        .spacing(16))
+        .push(row![
+            text("名称:").color(Color::WHITE),
+            text_input("输入名称...", &new_card_name)
+                .on_input(Message::TimerNewCardNameChanged),
+        ]
+        .spacing(8));
+    
+    if new_card_type == NodeType::Card {
+        col = col.push(row![
+            text("预设:").color(Color::WHITE),
+            text_input("default", &new_card_preset)
+                .on_input(Message::TimerNewCardPresetChanged),
+        ]
+        .spacing(8));
+    }
+    
+    let error_text = error_message.clone().unwrap_or_default();
+    if !error_text.is_empty() {
+        col = col.push(text(error_text).color(Color::from_rgb(0.9, 0.3, 0.2)).size(13));
+    }
+    
+    col = col
+        .push(button(text("创建").color(Color::WHITE))
+            .on_press(Message::TimerNewCardConfirm))
+        .push(Space::new().height(16))
+        .push(row![
+            text("记忆质量:").color(Color::WHITE),
+            MemoryQualitySelector::view(&memory_quality),
+        ])
+        .push(Space::new().height(24))
+        .push(row![
+            button(text("取消"))
+                .on_press(Message::TimerLinkModeClose),
+            button(text("保存并预测"))
+                .on_press(Message::TimerLinkConfirm),
+        ]
+        .spacing(12));
+    
+    container(col)
+        .padding(24)
+        .style(|_| container::Style {
+            background: Some(Color::from_rgb(0.2, 0.2, 0.2).into()),
+            ..Default::default()
+        })
+        .into()
 }
 
 struct MemoryQualitySelector;

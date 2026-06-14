@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::data::models::MemoryQuality;
+use crate::gui::NodeType;
 use crate::timer::TimerState;
 
 pub struct TimerTabState {
@@ -17,6 +18,7 @@ pub struct TimerTabState {
     pub current_card: Option<String>,
     pub new_card_name: String,
     pub new_card_preset: String,
+    pub new_card_type: NodeType,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,6 +45,7 @@ impl TimerTabState {
             current_card: None,
             new_card_name: String::new(),
             new_card_preset: "default".to_string(),
+            new_card_type: NodeType::Card,
         }
     }
 }
