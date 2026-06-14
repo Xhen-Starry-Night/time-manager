@@ -7,7 +7,7 @@ use iced::Length;
 use chrono::{Datelike, Utc};
 
 use crate::data::DataFs;
-use crate::data::models::{Card, Todo};
+use crate::data::models::{Card, Preset, Todo};
 use crate::gui::{Message, TabId, Modal, DataSnapshot, NodeType};
 use crate::gui::components::{tree_view::TreeNode, ModalView, NewTodoForm, NewNodeModal};
 use crate::timer::TimerManager;
@@ -220,7 +220,116 @@ impl App {
                 }
                 Task::none()
             }
-            
+
+            Message::PresetsLoaded(result) => {
+                match result {
+                    Ok(presets) => {
+                        self.preset_tab.presets = presets;
+                    }
+                    Err(e) => {
+                        self.error_message = Some(e.to_string());
+                    }
+                }
+                Task::none()
+            }
+
+            Message::PresetCreateOpen => {
+                self.preset_tab.reset_form();
+                self.preset_tab.show_form = true;
+                Task::none()
+            }
+
+            Message::PresetEditOpen(name) => {
+                self.preset_tab.load_from_preset(&name);
+                self.preset_tab.show_form = true;
+                Task::none()
+            }
+
+            Message::PresetFormDismissed => {
+                self.preset_tab.show_form = false;
+                self.preset_tab.reset_form();
+                Task::none()
+            }
+
+            Message::PresetFormNameChanged(val) => {
+                self.preset_tab.form_name = val;
+                Task::none()
+            }
+
+            Message::PresetFormDescriptionChanged(val) => {
+                self.preset_tab.form_description = val;
+                Task::none()
+            }
+
+            Message::PresetFormMatchRulesChanged(val) => {
+                self.preset_tab.form_match_rules = val;
+                Task::none()
+            }
+
+            Message::PresetFormSaveRequested => {
+                match self.preset_tab.validate() {
+                    Ok(preset) => {
+                        let data_fs = self.data_fs.clone();
+                        let old_name = self.preset_tab.editing_name.clone();
+                        self.preset_tab.show_form = false;
+                        self.preset_tab.reset_form();
+                        Task::perform(
+                            async move {
+                                if let Some(ref old) = old_name {
+                                    if old != &preset.name {
+                                        data_fs.rename_preset(old, &preset.name).map_err(|e| e.to_string())?;
+                                        data_fs.list_presets().map_err(|e| e.to_string())
+                                    } else {
+                                        data_fs.save_preset(&preset).map_err(|e| e.to_string())?;
+                                        data_fs.list_presets().map_err(|e| e.to_string())
+                                    }
+                                } else {
+                                    data_fs.save_preset(&preset).map_err(|e| e.to_string())?;
+                                    data_fs.list_presets().map_err(|e| e.to_string())
+                                }
+                            },
+                            |result: Result<Vec<Preset>, String>| {
+                                match result {
+                                    Ok(presets) => Message::PresetsLoaded(Ok(presets)),
+                                    Err(e) => Message::Error(e),
+                                }
+                            },
+                        )
+                    }
+                    Err(e) => {
+                        self.preset_tab.form_error = Some(e);
+                        Task::none()
+                    }
+                }
+            }
+
+            Message::PresetDeleteRequested(name) => {
+                self.preset_tab.delete_target = Some(name);
+                Task::none()
+            }
+
+            Message::PresetDeleteConfirmed(name) => {
+                self.preset_tab.delete_target = None;
+                let data_fs = self.data_fs.clone();
+                Task::perform(
+                    async move {
+                        data_fs.delete_preset(&name).map_err(|e| e.to_string())?;
+                        data_fs.list_presets().map_err(|e| e.to_string())
+                    },
+                    |result: Result<Vec<Preset>, String>| {
+                        match result {
+                            Ok(presets) => Message::PresetsLoaded(Ok(presets)),
+                            Err(e) => Message::Error(e),
+                        }
+                    },
+                )
+            }
+
+            Message::PresetDeleteDismissed => {
+                self.preset_tab.delete_target = None;
+                Task::none()
+            }
+
             Message::CardSelected(path) => {
                 self.category_tab.selected_path = Some(path.clone());
                 Task::none()
