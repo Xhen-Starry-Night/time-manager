@@ -24,17 +24,17 @@ impl Default for TreeView {
 }
 
 impl TreeView {
-    pub fn view<'a>(&'a self, nodes: &'a [TreeNode], selected: Option<&'a str>) -> Element<'a, String> {
-        column(nodes.iter().map(|node| self.view_node(node, selected, 0)))
+    pub fn view_static(&self, nodes: &[TreeNode], selected: Option<String>) -> Element<'static, String> {
+        column(nodes.iter().map(|node| self.view_node_static(node, selected.clone(), 0)))
             .spacing(2)
             .into()
     }
     
-    fn view_node(&self, node: &TreeNode, selected: Option<&str>, depth: usize) -> Element<String> {
+    fn view_node_static(&self, node: &TreeNode, selected: Option<String>, depth: usize) -> Element<'static, String> {
         let indent = "  ".repeat(depth);
         let icon = if node.is_card { "📄" } else { "📁" };
         
-        let is_selected = selected == Some(node.path.as_str());
+        let is_selected = selected.as_deref() == Some(node.path.as_str());
         
         let content = row![
             text(format!("{}{} {}", indent, icon, node.name)).color(iced::Color::WHITE),
@@ -64,7 +64,7 @@ impl TreeView {
             column![
                 btn,
                 if is_expanded && !node.children.is_empty() {
-                    column(node.children.iter().map(|c| self.view_node(c, selected, depth + 1)))
+                    column(node.children.iter().map(|c| self.view_node_static(c, selected.clone(), depth + 1)))
                         .spacing(1)
                 } else {
                     column![]

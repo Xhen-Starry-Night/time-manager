@@ -1187,9 +1187,9 @@ impl App {
                         column![].into()
                     };
                     
-                    let tree_element = self.category_tab.tree_view.view(
+                    let tree_element = self.category_tab.tree_view.view_static(
                         &self.category_tab.tree_nodes,
-                        self.category_tab.selected_path.as_deref(),
+                        self.category_tab.selected_path.clone(),
                     ).map(|path| Message::CardSelected(path));
                     
                     let left_content = column![
@@ -1419,7 +1419,7 @@ impl App {
                 use crate::gui::components::TimerDisplay;
                 
                 if self.timer_tab.link_mode {
-                    // 链接模态框模式 - 使用独立的视图函数避免生命周期问题
+                    // 链接模态框模式 - 直接在 App::view 中构建，避免生命周期问题
                     let duration_ms = self.timer_tab.elapsed_ms;
                     let card_path = self.timer_tab.card_path_input.clone();
                     let card_dropdown = self.timer_tab.card_dropdown.clone();
@@ -1428,8 +1428,21 @@ impl App {
                     let show_new_card_form = self.timer_tab.show_new_card_form;
                     let new_card_name = self.timer_tab.new_card_name.clone();
                     let new_card_preset = self.timer_tab.new_card_preset.clone();
+                    let tree_nodes = &self.category_tab.tree_nodes;
+                    let tree_view = &self.category_tab.tree_view;
                     
-                    view_link_timer_modal(duration_ms, card_path, card_dropdown, selected_card, memory_quality, show_new_card_form, new_card_name, new_card_preset)
+                    build_link_timer_modal(
+                        duration_ms,
+                        card_path,
+                        card_dropdown,
+                        selected_card,
+                        memory_quality,
+                        show_new_card_form,
+                        new_card_name,
+                        new_card_preset,
+                        tree_view,
+                        tree_nodes,
+                    )
                 } else {
                     let timer_display = TimerDisplay::view(&self.timer_tab.state, self.timer_tab.elapsed_ms, self.timer_tab.current_card.as_deref())
                         .map(|_| Message::ClearError);
@@ -2194,7 +2207,7 @@ fn review_card_item(card_name: String, path: String, urgency: i32, is_selected: 
     .into()
 }
 
-fn view_link_timer_modal(
+fn build_link_timer_modal(
     duration_ms: i64,
     card_path: String,
     card_dropdown: Vec<String>,
@@ -2203,8 +2216,10 @@ fn view_link_timer_modal(
     show_new_card_form: bool,
     new_card_name: String,
     new_card_preset: String,
+    tree_view: &crate::gui::components::TreeView,
+    tree_nodes: &[crate::gui::components::tree_view::TreeNode],
 ) -> Element<'static, Message> {
-    use iced::widget::{button, column, row, text, container, text_input, pick_list, Space};
+    use iced::widget::{button, column, row, text, container, text_input, pick_list, Space, scrollable};
     use iced::{Length, Color};
     
     let seconds = duration_ms / 1000;
@@ -2218,6 +2233,27 @@ fn view_link_timer_modal(
     } else {
         format!("{}秒", seconds)
     };
+    
+    // 树形选择器部分 - 使用静态引用避免生命周期问题
+    let selected_card_str = selected_card.clone();
+    let tree_picker: Element<Message> = container(
+        column![
+            text("或从树形导航选择:").color(Color::WHITE).size(14),
+            Space::new().height(4),
+            scrollable(
+                tree_view.view_static(tree_nodes, selected_card_str)
+                    .map(|path| Message::TimerCardSelected(path))
+            )
+            .height(Length::Fixed(200.0)),
+        ]
+        .spacing(4)
+    )
+    .style(|_| container::Style {
+        background: Some(Color::from_rgb(0.15, 0.15, 0.15).into()),
+        ..Default::default()
+    })
+    .padding(8)
+    .into();
     
     container(
         column![
@@ -2243,6 +2279,9 @@ fn view_link_timer_modal(
                     Message::TimerCardSelected,
                 ),
             ],
+            
+            // 树形选择器
+            tree_picker,
             
             // 连接到新卡片
             button(text("连接到新卡片..."))

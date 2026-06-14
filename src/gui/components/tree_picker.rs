@@ -17,7 +17,7 @@ impl TreePicker {
                 text("或从树形导航选择:").color(Color::WHITE).size(14),
                 Space::new().height(4),
                 scrollable(
-                    tree_view.view(tree_nodes, selected_card)
+                    tree_view.view_static(tree_nodes, selected_card.map(|s| s.to_string()))
                         .map(|path| Message::TimerCardSelected(path))
                 )
                 .height(Length::Fixed(200.0)),
