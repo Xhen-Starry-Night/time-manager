@@ -27,11 +27,12 @@ impl MemoryQuality {
     }
 
     pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "重学" => Some(Self::Relearn),
-            "困难" => Some(Self::Hard),
-            "好" => Some(Self::Good),
-            "简单" => Some(Self::Easy),
+        let lower = s.to_ascii_lowercase();
+        match lower.as_str() {
+            "重学" | "relearn" | "again" => Some(Self::Relearn),
+            "困难" | "hard" => Some(Self::Hard),
+            "好" | "good" => Some(Self::Good),
+            "简单" | "easy" => Some(Self::Easy),
             _ => None,
         }
     }
