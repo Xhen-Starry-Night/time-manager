@@ -2237,16 +2237,11 @@ fn build_link_timer_modal(
     // 树形选择器部分 - 使用静态引用避免生命周期问题
     let selected_card_str = selected_card.clone();
     let tree_picker: Element<Message> = container(
-        column![
-            text("或从树形导航选择:").color(Color::WHITE).size(14),
-            Space::new().height(4),
-            scrollable(
-                tree_view.view_static(tree_nodes, selected_card_str)
-                    .map(|path| Message::TimerCardSelected(path))
-            )
-            .height(Length::Fixed(200.0)),
-        ]
-        .spacing(4)
+        scrollable(
+            tree_view.view_static(tree_nodes, selected_card_str)
+                .map(|path| Message::TimerCardSelected(path))
+        )
+        .height(Length::Fixed(200.0))
     )
     .style(|_| container::Style {
         background: Some(Color::from_rgb(0.15, 0.15, 0.15).into()),
@@ -2263,27 +2258,17 @@ fn build_link_timer_modal(
             
             Space::new().height(16),
             
-            // 卡片路径输入（手动输入）
+            // 卡片路径输入（手动输入或从树形选择）
             row![
                 text("关联:").color(Color::WHITE),
-                text_input("输入卡片路径...", &card_path)
+                text_input("输入卡片路径或从下方选择...", &card_path)
                     .on_input(Message::TimerCardPathChanged),
-            ],
-            
-            // 下拉选择
-            row![
-                text("选择:").color(Color::WHITE),
-                pick_list(
-                    card_dropdown.clone(),
-                    selected_card.clone(),
-                    Message::TimerCardSelected,
-                ),
             ],
             
             // 树形选择器
             tree_picker,
             
-            // 连接到新卡片
+            // 连接到新卡片（在已选路径下创建）
             button(text("连接到新卡片..."))
                 .on_press(Message::TimerCreateNewCard),
             
