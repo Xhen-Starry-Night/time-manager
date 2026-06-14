@@ -416,20 +416,38 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
             summary,
         } => {
             let fs = DataFs::init(data_dir)?;
-            let id = uuid::Uuid::new_v4();
-            let ics_content = format!(
-                "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART:{}\nDTEND:{}\nSUMMARY:{}\nEND:VEVENT\nEND:VCALENDAR",
-                start, end, summary
-            );
-            fs.save_schedule(&id, &ics_content)?;
-            println!("Created schedule: {}", id);
+            use time_manager::data::models::{Schedule, RecurrenceRule};
+            let dtstart = chrono::NaiveDateTime::parse_from_str(&start, "%Y%m%dT%H%M%SZ")
+                .map(|dt| chrono::DateTime::from_naive_utc_and_offset(dt, chrono::Utc))
+                .map_err(|e| time_manager::data::DataError::Io(e.to_string()))?;
+            let dtend = chrono::NaiveDateTime::parse_from_str(&end, "%Y%m%dT%H%M%SZ")
+                .map(|dt| chrono::DateTime::from_naive_utc_and_offset(dt, chrono::Utc))
+                .map_err(|e| time_manager::data::DataError::Io(e.to_string()))?;
+            let schedule = Schedule {
+                id: uuid::Uuid::new_v4(),
+                summary,
+                dtstart,
+                dtend,
+                description: None,
+                location: None,
+                categories: Vec::new(),
+                priority: None,
+                rrule: RecurrenceRule::None,
+                reminder_minutes: None,
+            };
+            fs.save_schedule(&schedule)?;
+            println!("Created schedule: {}", schedule.id);
         }
 
         ScheduleList => {
             let fs = DataFs::init(data_dir)?;
             let schedules = fs.list_schedules()?;
-            for (id, _content) in schedules {
-                println!("{}", id);
+            for schedule in &schedules {
+                println!("{} | {} | {} - {}",
+                    schedule.id,
+                    schedule.summary,
+                    schedule.dtstart.format("%Y-%m-%d %H:%M"),
+                    schedule.dtend.format("%Y-%m-%d %H:%M"));
             }
         }
 

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
-use crate::data::models::{Card, Preset, Timer, Todo};
+use crate::data::models::{Card, Preset, Schedule, Timer, Todo};
 use crate::data::{DataError, Result};
 
 #[derive(Clone)]
@@ -306,14 +306,14 @@ impl DataFs {
         Ok(())
     }
 
-    pub fn save_schedule(&self, id: &uuid::Uuid, ics_content: &str) -> Result<()> {
-        let file_path = self.data_dir.join("schedules").join(format!("{}.ics", id));
-
-        std::fs::write(&file_path, ics_content).map_err(|e| DataError::Io(e.to_string()))?;
+    pub fn save_schedule(&self, schedule: &Schedule) -> Result<()> {
+        let file_path = self.data_dir.join("schedules").join(format!("{}.ics", schedule.id));
+        let ics = crate::data::schedule::format_ics(schedule);
+        std::fs::write(&file_path, ics).map_err(|e| DataError::Io(e.to_string()))?;
         Ok(())
     }
 
-    pub fn get_schedule(&self, id: &uuid::Uuid) -> Result<String> {
+    pub fn get_schedule(&self, id: &uuid::Uuid) -> Result<Schedule> {
         let file_path = self.data_dir.join("schedules").join(format!("{}.ics", id));
 
         if !file_path.exists() {
@@ -321,34 +321,35 @@ impl DataFs {
         }
 
         let content = std::fs::read_to_string(&file_path).map_err(|e| DataError::Io(e.to_string()))?;
-        Ok(content)
+        crate::data::schedule::parse_ics(&content)
     }
 
-    pub fn list_schedules(&self) -> Result<Vec<(uuid::Uuid, String)>> {
+    pub fn list_schedules(&self) -> Result<Vec<Schedule>> {
         let schedules_dir = self.data_dir.join("schedules");
         if !schedules_dir.exists() {
             return Ok(Vec::new());
         }
 
-        let schedules: Vec<(uuid::Uuid, String)> = WalkDir::new(&schedules_dir)
+        let mut schedules: Vec<Schedule> = WalkDir::new(&schedules_dir)
             .into_iter()
             .filter_map(|e| e.ok())
-            .filter(|e| {
-                e.path()
-                    .extension()
-                    .map(|ext| ext == "ics")
-                    .unwrap_or(false)
-            })
+            .filter(|e| e.path().extension().map(|ext| ext == "ics").unwrap_or(false))
             .filter_map(|e| {
-                let filename = e.file_name().to_string_lossy();
-                let id_str = filename.replace(".ics", "");
-                let id = uuid::Uuid::parse_str(&id_str).ok()?;
                 let content = std::fs::read_to_string(e.path()).ok()?;
-                Some((id, content))
+                crate::data::schedule::parse_ics(&content).ok()
             })
             .collect();
 
+        schedules.sort_by(|a, b| a.dtstart.cmp(&b.dtstart));
         Ok(schedules)
+    }
+
+    pub fn delete_schedule(&self, id: &uuid::Uuid) -> Result<()> {
+        let file_path = self.data_dir.join("schedules").join(format!("{}.ics", id));
+        if file_path.exists() {
+            std::fs::remove_file(&file_path).map_err(|e| DataError::Io(e.to_string()))?;
+        }
+        Ok(())
     }
 
     pub fn delete_card(&self, path: &str) -> Result<()> {

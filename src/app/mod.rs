@@ -1731,24 +1731,14 @@ impl App {
                     container(
                         scrollable(
                             column(
-                                self.schedule_tab.schedules.iter().map(|(_id, ics_content)| {
-                                    let summary = ics_content
-                                        .lines()
-                                        .find(|line| line.starts_with("SUMMARY:"))
-                                        .map(|line| line.strip_prefix("SUMMARY:").unwrap_or("未知日程"))
-                                        .unwrap_or("未知日程");
-                                    
-                                    let dtstart = ics_content
-                                        .lines()
-                                        .find(|line| line.starts_with("DTSTART:"))
-                                        .and_then(|line| line.strip_prefix("DTSTART:"))
-                                        .and_then(|s| chrono::NaiveDateTime::parse_from_str(s, "%Y%m%dT%H%M%SZ").ok())
-                                        .map(|dt| dt.format("%m-%d %H:%M").to_string())
-                                        .unwrap_or_else(|| "未知时间".to_string());
-                                    
+                                self.schedule_tab.schedules.iter().map(|schedule| {
+                                    let time_str = format!("{} - {}",
+                                        schedule.dtstart.format("%m/%d %H:%M"),
+                                        schedule.dtend.format("%H:%M"));
+
                                     row![
-                                        text(dtstart).color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
-                                        text(summary).color(iced::Color::WHITE),
+                                        text(time_str).color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                                        text(&schedule.summary).color(iced::Color::WHITE),
                                     ]
                                     .spacing(12)
                                     .padding(8)

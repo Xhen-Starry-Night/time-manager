@@ -1,12 +1,12 @@
+use crate::data::models::Schedule;
+
 pub struct ScheduleTabState {
-    pub selected_schedule: Option<uuid::Uuid>,
-    pub schedules: Vec<(uuid::Uuid, String)>,
+    pub schedules: Vec<Schedule>,
 }
 
 impl Default for ScheduleTabState {
     fn default() -> Self {
         Self {
-            selected_schedule: None,
             schedules: Vec::new(),
         }
     }
