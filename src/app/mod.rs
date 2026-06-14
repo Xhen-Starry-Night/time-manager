@@ -2515,9 +2515,6 @@ impl App {
                 Modal::Info { message } => {
                     (
                         column![
-                            text("提示")
-                                .color(iced::Color::WHITE)
-                                .size(16),
                             text(message.clone())
                                 .color(iced::Color::from_rgb(0.3, 0.8, 0.3)),
                         ]
