@@ -1,4 +1,4 @@
-use iced::widget::{column, row, text, button, scrollable, Space, container};
+use iced::widget::{column, text, scrollable, Space, container};
 use iced::{Element, Length, Color};
 
 use crate::gui::components::tree_view::{TreeNode, TreeView};
@@ -18,7 +18,7 @@ impl TreePicker {
                 Space::new().height(4),
                 scrollable(
                     tree_view.view_static(tree_nodes, selected_card.map(|s| s.to_string()))
-                        .map(|path| Message::TimerCardSelected(path))
+                        .map(Message::TimerCardSelected)
                 )
                 .height(Length::Fixed(200.0)),
             ]

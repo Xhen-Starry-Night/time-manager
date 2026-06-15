@@ -54,7 +54,7 @@ fn test_fsrs_different_days_elapsed() {
         .unwrap();
 
     let (interval_1, _) = predictor
-        .predict_next_review(Some(state.clone()), MemoryQuality::Good, 1, 0.9)
+        .predict_next_review(Some(state), MemoryQuality::Good, 1, 0.9)
         .unwrap();
 
     let (interval_7, _) = predictor

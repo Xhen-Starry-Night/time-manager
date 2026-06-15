@@ -10,17 +10,9 @@ pub struct TreeNode {
     pub children: Vec<TreeNode>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct TreeView {
     expanded: HashMap<String, bool>,
-}
-
-impl Default for TreeView {
-    fn default() -> Self {
-        Self {
-            expanded: HashMap::new(),
-        }
-    }
 }
 
 impl TreeView {

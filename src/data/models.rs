@@ -26,7 +26,7 @@ impl MemoryQuality {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         let lower = s.to_ascii_lowercase();
         match lower.as_str() {
             "重学" | "relearn" | "again" => Some(Self::Relearn),
@@ -71,7 +71,7 @@ impl Default for Prediction {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Card {
     pub review_records: Vec<ReviewRecord>,
     pub prediction: Option<Prediction>,
@@ -79,10 +79,7 @@ pub struct Card {
 
 impl Card {
     pub fn new() -> Self {
-        Self {
-            review_records: Vec::new(),
-            prediction: None,
-        }
+        Self::default()
     }
 
     pub fn new_with_preset(preset: String) -> Self {
@@ -288,7 +285,7 @@ impl RecurrenceRule {
         }
     }
 
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s {
             "每天" => Self::Daily,
             "每周" => Self::Weekly,

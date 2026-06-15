@@ -1,4 +1,4 @@
-use iced::widget::{column, row, text, container};
+use iced::widget::{column, row, text};
 use iced::{Element, Length, Color};
 use crate::data::models::Card;
 

@@ -1,4 +1,4 @@
-use iced::widget::{button, column, row, text, text_input, radio, pick_list, Space};
+use iced::widget::{column, row, text, text_input, radio, pick_list, Space};
 use iced::{Element, Length};
 use crate::gui::{Message, NodeType};
 use crate::app::category_tab::NewNodeForm;

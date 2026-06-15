@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc, TimeZone};
+use chrono::{DateTime, Utc};
 use fsrs::{DEFAULT_PARAMETERS, FSRS, MemoryState};
 
 use crate::data::models::{MemoryQuality, ReviewRecord};
@@ -78,7 +78,7 @@ impl FsrsPredictor {
                 0
             } else {
                 let prev_time = records[i - 1].timestamp;
-                ((record.timestamp - prev_time).num_days().max(0) as u32)
+                (record.timestamp - prev_time).num_days().max(0) as u32
             };
 
             let next_states = self

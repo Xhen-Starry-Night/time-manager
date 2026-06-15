@@ -114,7 +114,7 @@ impl App {
                         todos,
                     }))
                 });
-                
+
                 (state, load_task)
             },
             App::update,
@@ -649,10 +649,9 @@ impl App {
             }
             
             Message::EditCardRemoveReview(index) => {
-                if let Some(ref mut form) = self.category_tab.edit_card_form {
-                    if index < form.review_records.len() {
-                        form.review_records.remove(index);
-                    }
+                if let Some(ref mut form) = self.category_tab.edit_card_form
+                    && index < form.review_records.len() {
+                    form.review_records.remove(index);
                 }
                 Task::none()
             }
@@ -680,7 +679,7 @@ impl App {
                         use crate::data::models::Prediction;
                         card.prediction = Some(Prediction {
                             algorithm: "fsrs".to_string(),
-                            next_review: form.next_review.unwrap_or_else(|| chrono::Utc::now()),
+                            next_review: form.next_review.unwrap_or_else(chrono::Utc::now),
                             fsrs_state_bytes: form.fsrs_state_bytes.clone(),
                             preset_used: form.preset.clone(),
                         });
@@ -794,7 +793,7 @@ impl App {
                 
                 let data_fs = Arc::new(self.data_fs.clone());
                 let default_preset = self.default_preset.clone();
-                return Task::future(async move {
+                Task::future(async move {
                     let predictor = FsrsPredictor::new().expect("Failed to create FSRS predictor");
                     let trees = data_fs.list_trees().unwrap_or_default();
                     let mut all_cards = Vec::new();
@@ -842,17 +841,17 @@ impl App {
                         presets,
                         todos,
                     }))
-                });
+                })
             }
             
             Message::TimerStarted => {
-                self.timer_manager.start();
+                let _ = self.timer_manager.start();
                 self.timer_tab.state = self.timer_manager.get_state().clone();
                 Task::none()
             }
             
             Message::TimerPaused => {
-                self.timer_manager.pause();
+                let _ = self.timer_manager.pause();
                 self.timer_tab.state = self.timer_manager.get_state().clone();
                 Task::none()
             }
@@ -862,7 +861,7 @@ impl App {
                     Ok(_path) => {
                         // 先保存计时时间，再停止计时器
                         let final_elapsed = self.timer_tab.elapsed_ms;
-                        self.timer_manager.stop();
+                        let _ = self.timer_manager.stop();
                         self.timer_tab.state = self.timer_manager.get_state().clone();
                         
                         // 如果有预设卡片路径，进入链接模式
@@ -900,7 +899,7 @@ impl App {
             }
             
             Message::TimerCardPathChanged(path) => {
-                self.timer_tab.card_path_input = path;
+                self.timer_tab.card_path_input = path.replace('\\', "/");
                 Task::none()
             }
             
@@ -941,8 +940,8 @@ impl App {
                         card.review_records.push(record);
                         
                         // 触发 FSRS 预测
-                        if let Ok(predictor) = crate::fsrs::FsrsPredictor::new() {
-                            if let Ok((next_review, new_state)) = predictor.predict_from_records(
+                        if let Ok(predictor) = crate::fsrs::FsrsPredictor::new()
+                            && let Ok((next_review, new_state)) = predictor.predict_from_records(
                                 &card.review_records,
                                 None,
                                 0.9
@@ -954,7 +953,6 @@ impl App {
                                     preset_used: self.default_preset.clone(),
                                 });
                             }
-                        }
                         
                         let _ = self.data_fs.save_card(&card_path, &card);
                     }
@@ -990,13 +988,13 @@ impl App {
             
             Message::TimerNewCardConfirm => {
                 if !self.timer_tab.new_card_name.is_empty() {
-                    let input_path = self.timer_tab.card_path_input.clone();
+                    let input_path = self.timer_tab.card_path_input.replace('\\', "/");
                     let node_name = self.timer_tab.new_card_name.clone();
                     let node_type = self.timer_tab.new_card_type;
                     let preset = self.timer_tab.new_card_preset.clone();
                     
                     let is_card_path = self.category_tab.tree_nodes.iter()
-                        .flat_map(|n| Self::flatten_tree(n))
+                        .flat_map(Self::flatten_tree)
                         .any(|n| n.path == input_path && n.is_card);
                     
                     let target_path = if input_path.is_empty() {
@@ -1058,7 +1056,7 @@ impl App {
                 self.active_tab = TabId::Timer;
                 
                 // 自动开始计时
-                self.timer_manager.start();
+                let _ = self.timer_manager.start();
                 self.timer_tab.state = self.timer_manager.get_state().clone();
                 
                 Task::none()
@@ -1560,7 +1558,7 @@ impl App {
         }
     }
     
-    fn view(&self) -> Element<Message> {
+    fn view(&self) -> Element<'_, Message> {
         use iced::widget::scrollable;
         
         let tabs = row![
@@ -1659,7 +1657,7 @@ impl App {
                     let tree_element = self.category_tab.tree_view.view_static(
                         &self.category_tab.tree_nodes,
                         self.category_tab.selected_path.clone(),
-                    ).map(|path| Message::CardSelected(path));
+                    ).map(Message::CardSelected);
                     
                     let left_content = column![
                         search_input,
@@ -1780,11 +1778,10 @@ impl App {
                         })
                     })
                     .filter(|(_, urgency, _)| {
-                        self.review_tab.urgency_filter.map_or(true, |filter| {
+                        self.review_tab.urgency_filter.is_none_or(|filter| {
                             match filter {
                                 3 => *urgency >= 3,
                                 2 => *urgency >= 2,
-                                1 => *urgency >= 1,
                                 _ => true,
                             }
                         })
@@ -2168,8 +2165,8 @@ impl App {
                             self.schedule_tab.schedules.iter().map(|schedule| {
                                 let weekday = weekday_cn(schedule.dtstart.weekday().num_days_from_monday());
                                 let start_str = format!("{}/{} ({})",
-                                    schedule.dtstart.format("%m").to_string(),
-                                    schedule.dtstart.format("%d").to_string(),
+                                    schedule.dtstart.format("%m"),
+                                    schedule.dtstart.format("%d"),
                                     weekday);
                                 let time_range = format!("{} - {}",
                                     schedule.dtstart.format("%H:%M"),
@@ -2451,17 +2448,6 @@ impl App {
                     })
                     .into()
             }
-            _ => {
-                container(
-                    text(format!("{:?} Tab - Under Construction", self.active_tab))
-                        .size(24)
-                )
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .center_x(Length::Fill)
-                .center_y(Length::Fill)
-                .into()
-            }
         };
         
         let base_view = column![tabs, rule::horizontal(1.0), content]
@@ -2604,7 +2590,7 @@ impl App {
                         row![
                             text("重复:").color(iced::Color::WHITE),
                             pick_list(rrule_options, Some(form.rrule.as_str().to_string()), move |s| {
-                                Message::ScheduleFormRruleChanged(RecurrenceRule::from_str(&s))
+                                Message::ScheduleFormRruleChanged(RecurrenceRule::parse(&s))
                             }).width(Length::Fixed(100.0)),
                         ].spacing(8).padding(4),
                         {
@@ -2791,7 +2777,7 @@ fn simple_edit_card_view(form: &category_tab::EditCardForm, presets: &[String]) 
                 vec!["好".to_string(), "简单".to_string(), "困难".to_string(), "重学".to_string()],
                 Some(form.new_review_quality.as_str().to_string()),
                 move |s| {
-                    let quality = crate::data::models::MemoryQuality::from_str(&s)
+                    let quality = crate::data::models::MemoryQuality::parse(&s)
                         .unwrap_or(crate::data::models::MemoryQuality::Good);
                     Message::EditCardNewReviewQualityChanged(quality)
                 }
@@ -2815,7 +2801,7 @@ fn simple_edit_card_view(form: &category_tab::EditCardForm, presets: &[String]) 
     .into()
 }
 
-fn card_action_buttons(path: &str) -> Element<Message> {
+fn card_action_buttons(path: &str) -> Element<'_, Message> {
     let path = path.to_string();
     row![
         button(
@@ -2849,10 +2835,10 @@ fn card_action_buttons(path: &str) -> Element<Message> {
     .into()
 }
 
-fn folder_action_buttons(path: &str) -> Element<Message> {
+fn folder_action_buttons(path: &str) -> Element<'_, Message> {
     let path = path.to_string();
     let is_tree_root = !path.contains('/');
-    let mut btns = row![
+    let btns = row![
         button(
             text("新建卡片").color(iced::Color::WHITE)
         )
@@ -2896,7 +2882,7 @@ fn folder_action_buttons(path: &str) -> Element<Message> {
     btns.into()
 }
 
-fn tab_button(label: &str, tab_id: TabId, active_tab: TabId) -> Element<Message> {
+fn tab_button(label: &str, tab_id: TabId, active_tab: TabId) -> Element<'_, Message> {
     let is_active = tab_id == active_tab;
     
     let btn = button(text(label).color(iced::Color::WHITE))
@@ -2918,7 +2904,7 @@ fn tab_button(label: &str, tab_id: TabId, active_tab: TabId) -> Element<Message>
     .into()
 }
 
-fn filter_button(label: &str, filter: Option<u32>, current: Option<u32>) -> Element<Message> {
+fn filter_button(label: &str, filter: Option<u32>, current: Option<u32>) -> Element<'_, Message> {
     let is_active = filter == current;
     
     let btn = button(text(label).color(iced::Color::WHITE))
@@ -2975,6 +2961,7 @@ fn review_card_item(card_name: String, path: String, urgency: i32, is_selected: 
     .into()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_link_timer_modal(
     duration_ms: i64,
     card_path: String,
@@ -3007,7 +2994,7 @@ fn build_link_timer_modal(
     let tree_picker: Element<Message> = container(
         scrollable(
             tree_view.view_static(tree_nodes, selected_card_str)
-                .map(|path| Message::TimerCardSelected(path))
+                .map(Message::TimerCardSelected)
         )
         .height(Length::Fixed(200.0))
     )
@@ -3018,7 +3005,7 @@ fn build_link_timer_modal(
     .padding(8)
     .into();
     
-    let type_options = vec![
+    let type_options = [
         (NodeType::Folder, "目录"),
         (NodeType::Card, "学习卡片"),
     ];
@@ -3102,8 +3089,7 @@ struct MemoryQualitySelector;
 
 impl MemoryQualitySelector {
     fn view(quality: &crate::data::models::MemoryQuality) -> Element<'static, Message> {
-        use iced::widget::{button, row, text};
-        use iced::Color;
+        use iced::widget::row;
         
         row![
             quality_button("重学", crate::data::models::MemoryQuality::Relearn, quality),
@@ -3141,7 +3127,7 @@ fn quality_button(label: &'static str, quality: crate::data::models::MemoryQuali
         })
         .into()
 }
-fn review_detail_panel(path: &str, card: &Card, stats: &review_tab::CardStats) -> Element<'static, Message> {
+fn review_detail_panel(path: &str, _card: &Card, stats: &review_tab::CardStats) -> Element<'static, Message> {
     let path_display = path.split('/')
         .collect::<Vec<_>>()
         .join(" > ");

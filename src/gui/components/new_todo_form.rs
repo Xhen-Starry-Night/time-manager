@@ -5,6 +5,7 @@ use crate::gui::Message;
 pub struct NewTodoForm;
 
 impl NewTodoForm {
+    #[allow(clippy::too_many_arguments)]
     pub fn view<'a>(
         content: &str,
         priority: Option<u32>,

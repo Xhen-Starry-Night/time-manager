@@ -1,5 +1,5 @@
 use iced::widget::{button, column, row, text, container, text_input, pick_list, Space};
-use iced::{Element, Length, Color};
+use iced::{Element, Color};
 use crate::data::models::MemoryQuality;
 use crate::gui::Message;
 
@@ -93,7 +93,7 @@ fn format_duration(ms: i64) -> String {
 pub struct MemoryQualitySelector;
 
 impl MemoryQualitySelector {
-    pub fn view(quality: &MemoryQuality) -> Element<Message> {
+    pub fn view(quality: &MemoryQuality) -> Element<'_, Message> {
         row![
             quality_button("重学", MemoryQuality::Relearn, quality),
             quality_button("困难", MemoryQuality::Hard, quality),

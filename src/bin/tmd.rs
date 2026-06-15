@@ -101,6 +101,7 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
 
         CardList { path } => {
             let fs = DataFs::init(data_dir)?;
+            let path = path.replace('\\', "/");
             let tree = path.split('/').next().unwrap_or("");
             let cards = fs.list_cards(tree)?;
             for (card_path, _) in cards {
@@ -129,7 +130,7 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
 
                 let preset = fs.get_preset(preset_name).ok();
 
-                let predictor = if let Some(ref p) = preset {
+                let _predictor = if let Some(ref p) = preset {
                     if let Some(ref params) = p.fsrs_parameters {
                         time_manager::fsrs::FsrsPredictor::with_parameters(params.clone())
                             .map_err(time_manager::data::DataError::InvalidData)?
@@ -173,7 +174,7 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
             let timer_obj = fs.get_timer(&timer)?;
 
             use time_manager::data::models::{MemoryQuality, ReviewRecord};
-            let mq = MemoryQuality::from_str(&quality).ok_or_else(|| {
+            let mq = MemoryQuality::parse(&quality).ok_or_else(|| {
                 time_manager::data::DataError::InvalidData(format!("Invalid quality: {}", quality))
             })?;
 
@@ -468,17 +469,16 @@ fn run_command(cli: Cli, data_dir: PathBuf) -> time_manager::data::Result<()> {
             for tree in trees {
                 let cards = fs.list_cards(&tree)?;
                 for (card_path, card) in cards {
-                    if let Some(prediction) = &card.prediction {
-                        if !prediction.fsrs_state_bytes.is_empty() {
-                            let urgency_level =
-                                time_manager::fsrs::FsrsPredictor::calculate_urgency(prediction.next_review);
+                    if let Some(prediction) = &card.prediction
+                        && !prediction.fsrs_state_bytes.is_empty() {
+                        let urgency_level =
+                            time_manager::fsrs::FsrsPredictor::calculate_urgency(prediction.next_review);
 
-                            cards_with_urgency.push((
-                                card_path.clone(),
-                                urgency_level,
-                                prediction.next_review,
-                            ));
-                        }
+                        cards_with_urgency.push((
+                            card_path.clone(),
+                            urgency_level,
+                            prediction.next_review,
+                        ));
                     }
                 }
             }

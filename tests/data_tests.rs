@@ -9,7 +9,7 @@ use time_manager::fsrs::FsrsPredictor;
 #[test]
 fn test_init_creates_all_directories() {
     let dir = tempdir().unwrap();
-    let fs = DataFs::init(dir.path().to_path_buf()).unwrap();
+    let _fs = DataFs::init(dir.path().to_path_buf()).unwrap();
 
     assert!(dir.path().join("categories").exists());
     assert!(dir.path().join("timers").exists());
@@ -359,7 +359,7 @@ fn test_deep_nested_card_path() {
 
     fs.save_card(deep_path, &card).unwrap();
 
-    let retrieved = fs.get_card(deep_path).unwrap();
+    let _retrieved = fs.get_card(deep_path).unwrap();
 
     assert!(
         dir.path()

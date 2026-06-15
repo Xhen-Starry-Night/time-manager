@@ -17,7 +17,7 @@ fn test_full_learning_workflow() {
     let mut card = Card::new();
     fs.save_card(card_path, &card).unwrap();
 
-    let loaded = fs.get_card(card_path).unwrap();
+    let _loaded = fs.get_card(card_path).unwrap();
 
     let predictor = FsrsPredictor::new().unwrap();
     let (interval, memory_state) = predictor
@@ -104,7 +104,7 @@ fn test_todo_to_schedule_workflow() {
         rrule: time_manager::data::models::RecurrenceRule::None,
         reminder_minutes: None,
     };
-    let schedule_id = schedule.id;
+    let _schedule_id = schedule.id;
     fs.save_schedule(&schedule).unwrap();
     fs.delete_todo(&todo_id).unwrap();
 

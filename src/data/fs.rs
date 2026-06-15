@@ -69,7 +69,8 @@ impl DataFs {
     }
 
     fn parse_path(path: &str) -> Result<(String, String)> {
-        let parts: Vec<&str> = path.splitn(2, '/').collect();
+        let normalized = path.replace('\\', "/");
+        let parts: Vec<&str> = normalized.splitn(2, '/').collect();
         if parts.len() < 2 {
             return Err(DataError::InvalidPath(path.into()));
         }
@@ -131,7 +132,7 @@ impl DataFs {
             .filter_map(|e| {
                 let path = e.path();
                 let card_path = path
-                    .strip_prefix(&self.data_dir.join("categories"))
+                    .strip_prefix(self.data_dir.join("categories"))
                     .ok()?;
                 let card_path_str = card_path
                     .to_string_lossy()

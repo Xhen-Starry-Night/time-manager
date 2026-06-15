@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use chrono::{DateTime, Utc};
 use crate::gui::components::TreeView;
 use crate::gui::components::tree_view::TreeNode;
 use crate::gui::NodeType;
@@ -50,6 +49,7 @@ pub struct EditCardForm {
 
 impl EditCardForm {
     pub fn new(path: String, card: &Card) -> Self {
+        let path = path.replace('\\', "/");
         let name = path.rsplit('/').next().unwrap_or(&path).to_string();
         let preset = card.prediction.as_ref()
             .map(|p| p.preset_used.clone())

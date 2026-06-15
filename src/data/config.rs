@@ -16,10 +16,22 @@ impl Config {
         }
         directories::ProjectDirs::from("com", "time-manager", "time-manager")
             .map(|p| p.config_dir().to_path_buf())
-            .unwrap_or_else(|| {
-                let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-                PathBuf::from(home).join(".config/time-manager")
-            })
+            .unwrap_or_else(Self::default_config_dir)
+    }
+
+    fn default_config_dir() -> PathBuf {
+        #[cfg(windows)]
+        {
+            if let Ok(profile) = std::env::var("USERPROFILE") {
+                return PathBuf::from(profile).join("AppData/Roaming/time-manager");
+            }
+            PathBuf::from(r"C:\Users\Default\.config\time-manager")
+        }
+        #[cfg(not(windows))]
+        {
+            let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+            PathBuf::from(home).join(".config/time-manager")
+        }
     }
 
     pub fn config_path() -> PathBuf {

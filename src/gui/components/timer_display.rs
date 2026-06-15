@@ -1,4 +1,4 @@
-use iced::widget::{column, row, text, container, button, Space};
+use iced::widget::{column, text, container, Space};
 use iced::{Element, Length, Color};
 use crate::timer::TimerState;
 use crate::gui::Message;
