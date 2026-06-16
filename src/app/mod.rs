@@ -1656,7 +1656,8 @@ impl App {
                                         .spacing(4)
                                     )
                                     .on_press(Message::SearchItemSelected(i))
-                                    .style(move |_, _| {
+                                    .style(move |theme: &iced::Theme, _| {
+                                        let palette = theme.extended_palette();
                                         if is_selected {
                                             iced::widget::button::Style {
                                                 background: Some(iced::Color::from_rgb(0.3, 0.6, 0.9).into()),
@@ -1665,8 +1666,8 @@ impl App {
                                             }
                                         } else {
                                             iced::widget::button::Style {
-                                                background: Some(iced::Color::from_rgb(0.3, 0.3, 0.3).into()),
-                                                text_color: iced::Color::WHITE,
+                                                background: Some(palette.background.strong.color.into()),
+                                                text_color: palette.background.base.text,
                                                 ..Default::default()
                                             }
                                         }
@@ -2074,11 +2075,6 @@ impl App {
                             column(
                                 self.todo_tab.todos.iter().map(|todo| {
                                     let checkbox_text = if todo.completed { "☑" } else { "☐" };
-                                    let text_color = if todo.completed {
-                                        hint_text
-                                    } else {
-                                        iced::Color::WHITE
-                                    };
                                     
                                     let due_text = todo.due_date
                                         .map(|d| format!("截止: {}", d.format("%m-%d %H:%M")))
@@ -2096,34 +2092,43 @@ impl App {
                                     
                                     let is_selected = self.todo_tab.selected_todo == Some(todo.id);
                                     
-                                    let checkbox = button(text(checkbox_text).color(iced::Color::WHITE))
+                                    let checkbox = button(text(checkbox_text))
                                         .on_press(Message::ToggleTodo(todo.id))
-                                        .style(|_, _| iced::widget::button::Style {
-                                            background: Some(iced::Color::from_rgb(0.3, 0.3, 0.3).into()),
-                                            text_color: iced::Color::WHITE,
-                                            ..Default::default()
+                                        .style(|theme: &iced::Theme, _| {
+                                            let palette = theme.extended_palette();
+                                            iced::widget::button::Style {
+                                                background: Some(palette.background.strong.color.into()),
+                                                text_color: palette.background.base.text,
+                                                ..Default::default()
+                                            }
                                         });
                                     
                                     let delete_btn = button(text("删除").color(iced::Color::from_rgb(0.9, 0.3, 0.2)))
                                         .on_press(Message::DeleteTodo(todo.id))
-                                        .style(|_, _| iced::widget::button::Style {
-                                            background: Some(iced::Color::from_rgb(0.25, 0.25, 0.25).into()),
-                                            text_color: iced::Color::from_rgb(0.9, 0.3, 0.2),
-                                            ..Default::default()
+                                        .style(|theme: &iced::Theme, _| {
+                                            let palette = theme.extended_palette();
+                                            iced::widget::button::Style {
+                                                background: Some(palette.background.strong.color.into()),
+                                                text_color: iced::Color::from_rgb(0.9, 0.3, 0.2),
+                                                ..Default::default()
+                                            }
                                         });
                                     
                                     let edit_btn = button(text("编辑").color(iced::Color::from_rgb(0.4, 0.7, 0.9)))
                                         .on_press(Message::ModalOpen(Modal::EditTodo { id: todo.id }))
-                                        .style(|_, _| iced::widget::button::Style {
-                                            background: Some(iced::Color::from_rgb(0.25, 0.25, 0.25).into()),
-                                            text_color: iced::Color::from_rgb(0.4, 0.7, 0.9),
-                                            ..Default::default()
+                                        .style(|theme: &iced::Theme, _| {
+                                            let palette = theme.extended_palette();
+                                            iced::widget::button::Style {
+                                                background: Some(palette.background.strong.color.into()),
+                                                text_color: iced::Color::from_rgb(0.4, 0.7, 0.9),
+                                                ..Default::default()
+                                            }
                                         });
                                     
                                     let content_row = row![
                                         checkbox,
                                         text(priority_badge).color(iced::Color::from_rgb(0.95, 0.61, 0.07)),
-                                        text(&todo.content).color(text_color),
+                                        text(&todo.content).color(if todo.completed { hint_text } else { palette.background.base.text }),
                                         text(due_text).color(hint_text),
                                         text(tags_text).color(iced::Color::from_rgb(0.4, 0.7, 0.9)),
                                         Space::new().width(Length::Fill),
@@ -2136,13 +2141,16 @@ impl App {
                                     
                                     button(content_row)
                                         .on_press(Message::TodoSelected(todo.id))
-                                        .style(move |_, _| iced::widget::button::Style {
-                                            background: if is_selected {
-                                                Some(iced::Color::from_rgb(0.25, 0.25, 0.3).into())
-                                            } else {
-                                                Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into())
-                                            },
-                                            ..Default::default()
+                                        .style(move |theme: &iced::Theme, _| {
+                                            let palette = theme.extended_palette();
+                                            iced::widget::button::Style {
+                                                background: if is_selected {
+                                                    Some(palette.background.strong.color.into())
+                                                } else {
+                                                    Some(palette.background.weak.color.into())
+                                                },
+                                                ..Default::default()
+                                            }
                                         })
                                         .width(Length::Fill)
                                         .into()
@@ -2216,18 +2224,24 @@ impl App {
 
                                 let edit_btn = button(text("编辑").color(iced::Color::from_rgb(0.4, 0.7, 0.9)))
                                     .on_press(Message::ScheduleEditOpen(schedule.id))
-                                    .style(|_, _| iced::widget::button::Style {
-                                        background: Some(iced::Color::from_rgb(0.25, 0.25, 0.25).into()),
-                                        text_color: iced::Color::from_rgb(0.4, 0.7, 0.9),
-                                        ..Default::default()
+                                    .style(|theme: &iced::Theme, _| {
+                                        let palette = theme.extended_palette();
+                                        iced::widget::button::Style {
+                                            background: Some(palette.background.strong.color.into()),
+                                            text_color: iced::Color::from_rgb(0.4, 0.7, 0.9),
+                                            ..Default::default()
+                                        }
                                     });
 
                                 let delete_btn = button(text("删除").color(iced::Color::from_rgb(0.9, 0.3, 0.2)))
                                     .on_press(Message::ScheduleDelete(schedule.id))
-                                    .style(|_, _| iced::widget::button::Style {
-                                        background: Some(iced::Color::from_rgb(0.25, 0.25, 0.25).into()),
-                                        text_color: iced::Color::from_rgb(0.9, 0.3, 0.2),
-                                        ..Default::default()
+                                    .style(|theme: &iced::Theme, _| {
+                                        let palette = theme.extended_palette();
+                                        iced::widget::button::Style {
+                                            background: Some(palette.background.strong.color.into()),
+                                            text_color: iced::Color::from_rgb(0.9, 0.3, 0.2),
+                                            ..Default::default()
+                                        }
                                     });
 
                                 let location_text = schedule.location.as_ref()
@@ -2956,45 +2970,55 @@ fn folder_action_buttons(path: &str) -> Element<'_, Message> {
 fn tab_button(label: &str, tab_id: TabId, active_tab: TabId) -> Element<'_, Message> {
     let is_active = tab_id == active_tab;
     
-    let btn = button(text(label).color(iced::Color::WHITE))
-        .on_press(Message::SwitchTab(tab_id));
-    
     if is_active {
-        btn.style(|_, _| iced::widget::button::Style {
-            background: Some(iced::Color::from_rgb(0.2, 0.6, 0.86).into()),
-            text_color: iced::Color::WHITE,
-            ..Default::default()
-        })
+        button(text(label).color(iced::Color::WHITE))
+            .on_press(Message::SwitchTab(tab_id))
+            .style(|_, _| iced::widget::button::Style {
+                background: Some(iced::Color::from_rgb(0.2, 0.6, 0.86).into()),
+                text_color: iced::Color::WHITE,
+                ..Default::default()
+            })
+            .into()
     } else {
-        btn.style(|_, _| iced::widget::button::Style {
-            background: Some(iced::Color::from_rgb(0.3, 0.3, 0.3).into()),
-            text_color: iced::Color::WHITE,
-            ..Default::default()
-        })
+        button(text(label))
+            .on_press(Message::SwitchTab(tab_id))
+            .style(|theme: &iced::Theme, _| {
+                let palette = theme.extended_palette();
+                iced::widget::button::Style {
+                    background: Some(palette.background.weak.color.into()),
+                    text_color: palette.background.base.text,
+                    ..Default::default()
+                }
+            })
+            .into()
     }
-    .into()
 }
 
 fn filter_button(label: &str, filter: Option<u32>, current: Option<u32>) -> Element<'_, Message> {
     let is_active = filter == current;
     
-    let btn = button(text(label).color(iced::Color::WHITE))
-        .on_press(Message::UrgencyFilterChanged(filter));
-    
     if is_active {
-        btn.style(|_, _| iced::widget::button::Style {
-            background: Some(iced::Color::from_rgb(0.2, 0.6, 0.86).into()),
-            text_color: iced::Color::WHITE,
-            ..Default::default()
-        })
+        button(text(label).color(iced::Color::WHITE))
+            .on_press(Message::UrgencyFilterChanged(filter))
+            .style(|_, _| iced::widget::button::Style {
+                background: Some(iced::Color::from_rgb(0.2, 0.6, 0.86).into()),
+                text_color: iced::Color::WHITE,
+                ..Default::default()
+            })
+            .into()
     } else {
-        btn.style(|_, _| iced::widget::button::Style {
-            background: Some(iced::Color::from_rgb(0.3, 0.3, 0.3).into()),
-            text_color: iced::Color::WHITE,
-            ..Default::default()
-        })
+        button(text(label))
+            .on_press(Message::UrgencyFilterChanged(filter))
+            .style(|theme: &iced::Theme, _| {
+                let palette = theme.extended_palette();
+                iced::widget::button::Style {
+                    background: Some(palette.background.weak.color.into()),
+                    text_color: palette.background.base.text,
+                    ..Default::default()
+                }
+            })
+            .into()
     }
-    .into()
 }
 
 fn review_card_item(card_name: String, path: String, urgency: i32, is_selected: bool) -> Element<'static, Message> {
@@ -3007,23 +3031,24 @@ fn review_card_item(card_name: String, path: String, urgency: i32, is_selected: 
     
     button(
         column![
-            text(card_name).color(iced::Color::WHITE).size(13),
+            text(card_name).size(13),
             text(urgency_text).color(urgency_color).size(11),
         ]
         .spacing(2)
     )
     .on_press(Message::ReviewCardSelected(path))
-    .style(move |_, _| {
+    .style(move |theme: &iced::Theme, _| {
+        let palette = theme.extended_palette();
         if is_selected {
             iced::widget::button::Style {
-                background: Some(iced::Color::from_rgb(0.3, 0.5, 0.6).into()),
-                text_color: iced::Color::WHITE,
+                background: Some(palette.primary.strong.color.into()),
+                text_color: palette.primary.strong.text,
                 ..Default::default()
             }
         } else {
             iced::widget::button::Style {
-                background: Some(iced::Color::from_rgb(0.25, 0.25, 0.25).into()),
-                text_color: iced::Color::WHITE,
+                background: Some(palette.background.weak.color.into()),
+                text_color: palette.background.base.text,
                 ..Default::default()
             }
         }
@@ -3180,24 +3205,22 @@ impl MemoryQualitySelector {
 }
 
 fn quality_button(label: &'static str, quality: crate::data::models::MemoryQuality, current: &crate::data::models::MemoryQuality) -> Element<'static, Message> {
-    use iced::widget::{button, text};
-    use iced::Color;
-    
     let is_selected = *current == quality;
     
-    button(text(label).color(Color::WHITE))
+    button(text(label))
         .on_press(Message::TimerMemoryQualityChanged(quality))
-        .style(move |_, _| {
+        .style(move |theme: &iced::Theme, _| {
+            let palette = theme.extended_palette();
             if is_selected {
                 iced::widget::button::Style {
-                    background: Some(Color::from_rgb(0.2, 0.6, 0.86).into()),
-                    text_color: Color::WHITE,
+                    background: Some(palette.primary.strong.color.into()),
+                    text_color: palette.primary.strong.text,
                     ..Default::default()
                 }
             } else {
                 iced::widget::button::Style {
-                    background: Some(Color::from_rgb(0.3, 0.3, 0.3).into()),
-                    text_color: Color::WHITE,
+                    background: Some(palette.background.strong.color.into()),
+                    text_color: palette.background.base.text,
                     ..Default::default()
                 }
             }
