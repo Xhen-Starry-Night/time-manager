@@ -1,52 +1,80 @@
-use iced::Color;
+use iced::{Theme, Color};
 
-pub struct Theme {
-    pub urgency_expired: Color,
-    pub urgency_today: Color,
-    pub urgency_soon: Color,
-    pub urgency_later: Color,
-    
-    pub primary: Color,
-    pub secondary: Color,
-    pub background: Color,
-    pub surface: Color,
-    pub text: Color,
-    pub text_secondary: Color,
-    
-    pub success: Color,
-    pub warning: Color,
-    pub error: Color,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AppTheme {
+    Light,
+    Dark,
+    #[cfg(target_os = "linux")]
+    Transparent,
 }
 
-impl Default for Theme {
-    fn default() -> Self {
-        Self {
-            urgency_expired: Color::from_rgb(0.906, 0.298, 0.235),
-            urgency_today: Color::from_rgb(0.953, 0.612, 0.071),
-            urgency_soon: Color::from_rgb(0.153, 0.682, 0.376),
-            urgency_later: Color::from_rgb(0.584, 0.647, 0.651),
-            
-            primary: Color::from_rgb(0.204, 0.596, 0.859),
-            secondary: Color::from_rgb(0.180, 0.800, 0.443),
-            background: Color::from_rgb(1.0, 1.0, 1.0),
-            surface: Color::from_rgb(0.961, 0.961, 0.961),
-            text: Color::from_rgb(0.173, 0.243, 0.314),
-            text_secondary: Color::from_rgb(0.4, 0.4, 0.4),
-            
-            success: Color::from_rgb(0.153, 0.682, 0.376),
-            warning: Color::from_rgb(0.953, 0.612, 0.071),
-            error: Color::from_rgb(0.906, 0.298, 0.235),
+impl AppTheme {
+    pub fn toggle(self) -> Self {
+        match self {
+            Self::Light => Self::Dark,
+            Self::Dark => {
+                #[cfg(target_os = "linux")]
+                { Self::Transparent }
+                #[cfg(not(target_os = "linux"))]
+                { Self::Light }
+            }
+            #[cfg(target_os = "linux")]
+            Self::Transparent => Self::Light,
         }
     }
-}
 
-impl Theme {
-    pub fn urgency_color(urgency: u32) -> Color {
-        match urgency {
-            3 => Self::default().urgency_expired,
-            2 => Self::default().urgency_today,
-            1 => Self::default().urgency_soon,
-            _ => Self::default().urgency_later,
+    pub fn display(&self) -> &'static str {
+        match self {
+            Self::Light => "浅色",
+            Self::Dark => "深色",
+            #[cfg(target_os = "linux")]
+            Self::Transparent => "透明",
+        }
+    }
+
+    pub fn to_iced_theme(&self) -> Theme {
+        match self {
+            Self::Light => Theme::Light,
+            Self::Dark => Theme::Dark,
+            #[cfg(target_os = "linux")]
+            Self::Transparent => Theme::custom_with_fn(
+                "transparent",
+                iced::theme::Palette {
+                    background: Color::from_rgba(0.102, 0.106, 0.149, 0.85),
+                    text: Color::from_rgb(0.753, 0.792, 0.961),
+                    primary: Color::from_rgb(0.204, 0.596, 0.859),
+                    success: Color::from_rgb(0.153, 0.682, 0.376),
+                    warning: Color::from_rgb(0.953, 0.612, 0.071),
+                    danger: Color::from_rgb(0.906, 0.298, 0.235),
+                },
+                iced::theme::palette::Extended::generate,
+            ),
+        }
+    }
+
+    pub fn default() -> Self {
+        #[cfg(target_os = "windows")]
+        { Self::Light }
+        #[cfg(not(target_os = "windows"))]
+        { Self::Transparent }
+    }
+
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "light" => Self::Light,
+            "dark" => Self::Dark,
+            #[cfg(target_os = "linux")]
+            "transparent" => Self::Transparent,
+            _ => Self::default(),
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Light => "light",
+            Self::Dark => "dark",
+            #[cfg(target_os = "linux")]
+            Self::Transparent => "transparent",
         }
     }
 }

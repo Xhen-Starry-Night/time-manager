@@ -1,3 +1,2 @@
 pub mod theme;
-
-pub use theme::Theme;
+pub use theme::AppTheme;
