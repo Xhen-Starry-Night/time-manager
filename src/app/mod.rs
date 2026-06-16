@@ -3119,18 +3119,17 @@ fn build_link_timer_modal(
     
     col = col
         .push(text(format!("学习时长: {}", duration_text))
-            .size(16)
-            .color(Color::WHITE))
+            .size(16))
         .push(Space::new().height(16))
         .push(row![
-            text("关联:").color(Color::WHITE),
+            text("关联:"),
             text_input("输入卡片路径或从下方选择...", &card_path)
                 .on_input(Message::TimerCardPathChanged),
         ])
         .push(tree_picker)
-        .push(text("创建:").color(Color::WHITE).size(14))
+        .push(text("创建:").size(14))
         .push(row![
-            text("类型:").color(Color::WHITE),
+            text("类型:"),
             pick_list(type_labels, Some(current_type_label), move |s| {
                 let t = if s == "目录" { NodeType::Folder } else { NodeType::Card };
                 Message::TimerNewCardTypeChanged(t)
@@ -3138,7 +3137,7 @@ fn build_link_timer_modal(
         ]
         .spacing(16))
         .push(row![
-            text("名称:").color(Color::WHITE),
+            text("名称:"),
             text_input("输入名称...", &new_card_name)
                 .on_input(Message::TimerNewCardNameChanged),
         ]
@@ -3146,7 +3145,7 @@ fn build_link_timer_modal(
     
     if new_card_type == NodeType::Card {
         col = col.push(row![
-            text("预设:").color(Color::WHITE),
+            text("预设:"),
             text_input("default", &new_card_preset)
                 .on_input(Message::TimerNewCardPresetChanged),
         ]
@@ -3159,19 +3158,40 @@ fn build_link_timer_modal(
     }
     
     col = col
-        .push(button(text("创建").color(Color::WHITE))
-            .on_press(Message::TimerNewCardConfirm))
+        .push(button(text("创建"))
+            .on_press(Message::TimerNewCardConfirm)
+            .style(|theme: &iced::Theme, _| {
+                let palette = theme.extended_palette();
+                iced::widget::button::Style {
+                    background: Some(palette.primary.strong.color.into()),
+                    text_color: palette.primary.strong.text,
+                    ..Default::default()
+                }
+            }))
         .push(Space::new().height(16))
         .push(row![
-            text("记忆质量:").color(Color::WHITE),
+            text("记忆质量:"),
             MemoryQualitySelector::view(&memory_quality),
         ])
         .push(Space::new().height(24))
         .push(row![
             button(text("取消"))
-                .on_press(Message::TimerLinkModeClose),
+                .on_press(Message::TimerLinkModeClose)
+                .style(|theme: &iced::Theme, _| {
+                    let palette = theme.extended_palette();
+                    iced::widget::button::Style {
+                        background: Some(palette.background.strong.color.into()),
+                        text_color: palette.background.base.text,
+                        ..Default::default()
+                    }
+                }),
             button(text("保存并预测"))
-                .on_press(Message::TimerLinkConfirm),
+                .on_press(Message::TimerLinkConfirm)
+                .style(|_, _| iced::widget::button::Style {
+                    background: Some(iced::Color::from_rgb(0.2, 0.6, 0.86).into()),
+                    text_color: iced::Color::WHITE,
+                    ..Default::default()
+                }),
         ]
         .spacing(12));
     
