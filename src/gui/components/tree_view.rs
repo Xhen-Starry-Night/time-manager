@@ -29,17 +29,18 @@ impl TreeView {
         let is_selected = selected.as_deref() == Some(node.path.as_str());
         
         let content = row![
-            text(format!("{}{} {}", indent, icon, node.name)).color(iced::Color::WHITE),
+            text(format!("{}{} {}", indent, icon, node.name)),
         ]
         .spacing(4);
         
         let btn = button(content)
             .on_press(node.path.clone())
-            .style(move |_, _| {
+            .style(move |theme: &iced::Theme, _| {
+                let palette = theme.extended_palette();
                 if is_selected {
                     iced::widget::button::Style {
-                        background: Some(iced::Color::from_rgb(0.2, 0.6, 0.86).into()),
-                        text_color: iced::Color::WHITE,
+                        background: Some(palette.primary.strong.color.into()),
+                        text_color: palette.primary.strong.text,
                         ..Default::default()
                     }
                 } else {

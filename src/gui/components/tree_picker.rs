@@ -24,9 +24,12 @@ impl TreePicker {
             ]
             .spacing(4)
         )
-        .style(|_| container::Style {
-            background: Some(Color::from_rgb(0.15, 0.15, 0.15).into()),
-            ..Default::default()
+        .style(|theme: &iced::Theme| {
+            let palette = theme.extended_palette();
+            container::Style {
+                background: Some(palette.background.base.color.into()),
+                ..Default::default()
+            }
         })
         .padding(8)
         .into()

@@ -24,7 +24,6 @@ impl TimerDisplay {
             container(
                 text(card)
                     .size(14)
-                    .color(Color::from_rgb(0.7, 0.7, 0.7))
             )
             .width(Length::Fill)
             .center_x(Length::Fill)
@@ -40,7 +39,6 @@ impl TimerDisplay {
             container(
                 text(display)
                     .size(72)
-                    .color(Color::WHITE)
             )
             .width(Length::FillPortion(2))
             .height(Length::FillPortion(1))

@@ -68,9 +68,12 @@ impl LinkTimerModal {
             .spacing(8)
         )
         .padding(24)
-        .style(|_| container::Style {
-            background: Some(Color::from_rgb(0.2, 0.2, 0.2).into()),
-            ..Default::default()
+        .style(|theme: &iced::Theme| {
+            let palette = theme.extended_palette();
+            container::Style {
+                background: Some(palette.background.weak.color.into()),
+                ..Default::default()
+            }
         })
         .into()
     }
@@ -110,7 +113,8 @@ fn quality_button<'a>(label: &'a str, quality: MemoryQuality, current: &'a Memor
     
     button(text(label).color(Color::WHITE))
         .on_press(Message::TimerMemoryQualityChanged(quality))
-        .style(move |_, _| {
+        .style(move |theme: &iced::Theme, _| {
+            let palette = theme.extended_palette();
             if is_selected {
                 iced::widget::button::Style {
                     background: Some(Color::from_rgb(0.2, 0.6, 0.86).into()),
@@ -119,8 +123,8 @@ fn quality_button<'a>(label: &'a str, quality: MemoryQuality, current: &'a Memor
                 }
             } else {
                 iced::widget::button::Style {
-                    background: Some(Color::from_rgb(0.3, 0.3, 0.3).into()),
-                    text_color: Color::WHITE,
+                    background: Some(palette.background.strong.color.into()),
+                    text_color: palette.background.base.text,
                     ..Default::default()
                 }
             }

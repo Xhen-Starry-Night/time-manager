@@ -1583,6 +1583,10 @@ impl App {
     fn view(&self) -> Element<'_, Message> {
         use iced::widget::scrollable;
         
+        let theme = self.theme.to_iced_theme();
+        let palette = theme.extended_palette();
+        let hint_text = palette.background.weak.text;
+        
         let tabs = row![
             tab_button("分类树", TabId::Category, self.active_tab),
             tab_button("复习看板", TabId::Review, self.active_tab),
@@ -1620,17 +1624,18 @@ impl App {
                     )
                     .on_input(Message::SearchQueryChanged)
                     .width(Length::Fill)
-                    .style(move |_: &iced::Theme, _| {
+                    .style(move |theme: &iced::Theme, _| {
+                        let palette = theme.extended_palette();
                         iced::widget::text_input::Style {
-                            background: iced::Color::from_rgb(0.25, 0.25, 0.25).into(),
+                            background: palette.background.strong.color.into(),
                             border: iced::Border {
-                                color: iced::Color::from_rgb(0.3, 0.3, 0.3),
+                                color: palette.background.neutral.color,
                                 width: 1.0,
                                 radius: 4.0.into(),
                             },
-                            icon: iced::Color::from_rgb(0.5, 0.5, 0.5),
-                            placeholder: iced::Color::from_rgb(0.5, 0.5, 0.5),
-                            value: iced::Color::WHITE,
+                            icon: hint_text,
+                            placeholder: hint_text,
+                            value: palette.background.base.text,
                             selection: iced::Color::from_rgb(0.3, 0.6, 0.9),
                         }
                     });
@@ -1703,12 +1708,12 @@ impl App {
                             .find(|(path, _)| path == selected_path);
                         
                         if let Some((path, card)) = card_data {
-                            container(
-                                column![
-                                    row![
-                                        text("路径: ").color(iced::Color::WHITE),
-                                        text(path).color(iced::Color::WHITE),
-                                    ],
+                                container(
+                                    column![
+                                        row![
+                                            text("路径: "),
+                                            text(path),
+                                        ],
                                     Space::new().height(12),
                                     card_action_buttons(path),
                                     Space::new().height(12),
@@ -1729,18 +1734,21 @@ impl App {
                             )
                             .width(Length::FillPortion(3))
                             .height(Length::Fill)
-                            .style(|_: &iced::Theme| iced::widget::container::Style {
-                                background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
-                                ..Default::default()
-                            })
+.style(|theme: &iced::Theme| {
+            let palette = theme.extended_palette();
+            iced::widget::container::Style {
+                background: Some(palette.background.weak.color.into()),
+                ..Default::default()
+            }
+        })
                         } else {
                             let children_count = self.count_tree_children(selected_path);
                             
                             container(
                                 column![
                                     row![
-                                        text("路径: ").color(iced::Color::WHITE),
-                                        text(selected_path).color(iced::Color::WHITE),
+                                        text("路径: "),
+                                        text(selected_path),
                                     ],
                                     Space::new().height(12),
                                     folder_action_buttons(selected_path),
@@ -1748,22 +1756,25 @@ impl App {
                                     rule::horizontal(1.0),
                                     Space::new().height(12),
                                     row![
-                                        text("子项数量: ").color(iced::Color::WHITE),
-                                        text(format!("{} 个", children_count)).color(iced::Color::WHITE),
+                                        text("子项数量: "),
+                                        text(format!("{} 个", children_count)),
                                     ],
                                     Space::new().height(8),
                                     text("(选中具体节点查看详情)")
-                                        .color(iced::Color::from_rgb(0.6, 0.6, 0.6))
+                                        .color(hint_text)
                                         .size(14),
                                 ]
                                 .padding(16)
                             )
                             .width(Length::FillPortion(3))
                             .height(Length::Fill)
-                            .style(|_: &iced::Theme| iced::widget::container::Style {
-                                background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
-                                ..Default::default()
-                            })
+.style(|theme: &iced::Theme| {
+            let palette = theme.extended_palette();
+            iced::widget::container::Style {
+                background: Some(palette.background.weak.color.into()),
+                ..Default::default()
+            }
+        })
                         }
                     } else {
                         container(
@@ -1774,10 +1785,13 @@ impl App {
                         .height(Length::Fill)
                         .center_x(Length::Fill)
                         .center_y(Length::Fill)
-                        .style(|_: &iced::Theme| iced::widget::container::Style {
-                            background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
-                            ..Default::default()
-                        })
+                            .style(|theme: &iced::Theme| {
+                                let palette = theme.extended_palette();
+                                iced::widget::container::Style {
+                                    background: Some(palette.background.weak.color.into()),
+                                    ..Default::default()
+                                }
+                            })
                     };
                     
                     row![left_panel, right_panel]
@@ -1861,12 +1875,12 @@ impl App {
                         .find(|(path, _, _)| path == selected_path) 
                     {
                         let stats = CardStats::from_card(card);
-                        review_detail_panel(selected_path, card, &stats)
+                        review_detail_panel(selected_path, card, &stats, hint_text)
                     } else {
                         container(
                             text("选择卡片查看详情")
                                 .size(16)
-                                .color(iced::Color::from_rgb(0.6, 0.6, 0.6))
+                                .color(hint_text)
                         )
                         .width(Length::FillPortion(3))
                         .height(Length::Fill)
@@ -1878,7 +1892,7 @@ impl App {
                     container(
                         text("选择卡片查看详情")
                             .size(16)
-                            .color(iced::Color::from_rgb(0.6, 0.6, 0.6))
+                            .color(hint_text)
                     )
                     .width(Length::FillPortion(3))
                     .height(Length::Fill)
@@ -1901,9 +1915,12 @@ impl App {
                 container(content)
                     .width(Length::Fill)
                     .height(Length::Fill)
-                    .style(|_: &iced::Theme| iced::widget::container::Style {
-                        background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
-                        ..Default::default()
+                    .style(|theme: &iced::Theme| {
+                        let palette = theme.extended_palette();
+                        iced::widget::container::Style {
+                            background: Some(palette.background.weak.color.into()),
+                            ..Default::default()
+                        }
                     })
                     .into()
             }
@@ -1950,13 +1967,13 @@ impl App {
                                         text_color: iced::Color::WHITE,
                                         ..Default::default()
                                     }),
-                                button(text("暂停").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
-                                button(text("停止").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
+                                button(text("暂停").color(hint_text)),
+                                button(text("停止").color(hint_text)),
                             )
                         }
                         TimerState::Running { .. } => {
                             (
-                                button(text("开始").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
+                                button(text("开始").color(hint_text)),
                                 button(text("暂停").color(iced::Color::WHITE))
                                     .on_press(Message::TimerPaused)
                                     .style(|_, _| iced::widget::button::Style {
@@ -1982,7 +1999,7 @@ impl App {
                                         text_color: iced::Color::WHITE,
                                         ..Default::default()
                                     }),
-                                button(text("暂停").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
+                                button(text("暂停").color(hint_text)),
                                 button(text("停止").color(iced::Color::WHITE))
                                     .on_press(Message::TimerStopped(Ok(std::path::PathBuf::new())))
                                     .style(|_, _| iced::widget::button::Style {
@@ -2001,8 +2018,8 @@ impl App {
                                         text_color: iced::Color::WHITE,
                                         ..Default::default()
                                     }),
-                                button(text("暂停").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
-                                button(text("停止").color(iced::Color::from_rgb(0.5, 0.5, 0.5))),
+                                button(text("暂停").color(hint_text)),
+                                button(text("停止").color(hint_text)),
                             )
                         }
                     };
@@ -2020,9 +2037,12 @@ impl App {
                     .height(Length::Fill)
                     .center_x(Length::Fill)
                     .center_y(Length::Fill)
-                    .style(|_: &iced::Theme| iced::widget::container::Style {
-                        background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
-                        ..Default::default()
+                    .style(|theme: &iced::Theme| {
+                        let palette = theme.extended_palette();
+                        iced::widget::container::Style {
+                            background: Some(palette.background.weak.color.into()),
+                            ..Default::default()
+                        }
                     })
                     .into()
                 }
@@ -2057,7 +2077,7 @@ impl App {
                                 self.todo_tab.todos.iter().map(|todo| {
                                     let checkbox_text = if todo.completed { "☑" } else { "☐" };
                                     let text_color = if todo.completed {
-                                        iced::Color::from_rgb(0.5, 0.5, 0.5)
+                                        hint_text
                                     } else {
                                         iced::Color::WHITE
                                     };
@@ -2106,7 +2126,7 @@ impl App {
                                         checkbox,
                                         text(priority_badge).color(iced::Color::from_rgb(0.95, 0.61, 0.07)),
                                         text(&todo.content).color(text_color),
-                                        text(due_text).color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                                        text(due_text).color(hint_text),
                                         text(tags_text).color(iced::Color::from_rgb(0.4, 0.7, 0.9)),
                                         Space::new().width(Length::Fill),
                                         edit_btn,
@@ -2148,9 +2168,12 @@ impl App {
                 )
                 .width(Length::Fill)
                 .height(Length::Fill)
-                .style(|_: &iced::Theme| iced::widget::container::Style {
-                    background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
-                    ..Default::default()
+                .style(|theme: &iced::Theme| {
+                    let palette = theme.extended_palette();
+                    iced::widget::container::Style {
+                        background: Some(palette.background.weak.color.into()),
+                        ..Default::default()
+                    }
                 })
                 .into()
             }
@@ -2164,7 +2187,7 @@ impl App {
                     });
 
                 let header = row![
-                    text("日程").size(20).color(iced::Color::WHITE),
+                    text("日程").size(20),
                     Space::new().width(Length::Fill),
                     add_button,
                 ]
@@ -2218,15 +2241,15 @@ impl App {
                                     row![
                                         column![
                                             row![
-                                                text(start_str).color(iced::Color::from_rgb(0.7, 0.7, 0.7)).size(13),
+                                                text(start_str).color(hint_text).size(13),
                                                 Space::new().width(Length::Fixed(8.0)),
-                                                text(time_range).color(iced::Color::from_rgb(0.6, 0.6, 0.6)).size(13),
+                                                text(time_range).color(hint_text).size(13),
                                                 Space::new().width(Length::Fixed(8.0)),
                                                 text(&schedule.summary).color(iced::Color::WHITE).size(14),
                                             ],
                                             {
                                                 let loc_elem: Element<Message> = if !location_text.is_empty() {
-                                                    text(location_text).color(iced::Color::from_rgb(0.5, 0.5, 0.5)).size(12).into()
+                                                    text(location_text).color(hint_text).size(12).into()
                                                 } else {
                                                     row![].into()
                                                 };
@@ -2241,9 +2264,12 @@ impl App {
                                     .spacing(8)
                                     .padding(8)
                                 )
-                                .style(|_| iced::widget::container::Style {
-                                    background: Some(iced::Color::from_rgb(0.22, 0.22, 0.22).into()),
-                                    ..Default::default()
+                                .style(|theme: &iced::Theme| {
+                                    let palette = theme.extended_palette();
+                                    iced::widget::container::Style {
+                                        background: Some(palette.background.strong.color.into()),
+                                        ..Default::default()
+                                    }
                                 })
                                 .width(Length::Fill)
                                 .into()
@@ -2265,9 +2291,12 @@ impl App {
                 )
                 .width(Length::Fill)
                 .height(Length::Fill)
-                .style(|_: &iced::Theme| iced::widget::container::Style {
-                    background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
-                    ..Default::default()
+                .style(|theme: &iced::Theme| {
+                    let palette = theme.extended_palette();
+                    iced::widget::container::Style {
+                        background: Some(palette.background.weak.color.into()),
+                        ..Default::default()
+                    }
                 })
                 .into()
             }
@@ -2282,7 +2311,7 @@ impl App {
                         };
                         row![
                             text(preset.name.clone()).color(iced::Color::WHITE).width(Length::Fill),
-                            text(trained).color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                            text(trained).color(hint_text),
                             button(text("编辑").size(12))
                                 .style(iced::widget::button::text)
                                 .on_press(Message::PresetEditOpen(name.clone())),
@@ -2298,7 +2327,7 @@ impl App {
                     .collect();
 
                 let list = if self.preset_tab.presets.is_empty() {
-                    container(text("暂无预设").color(iced::Color::from_rgb(0.6, 0.6, 0.6)))
+                    container(text("暂无预设").color(hint_text))
                         .width(Length::Fill)
                         .height(Length::Fill)
                         .center_x(Length::Fill)
@@ -2311,7 +2340,7 @@ impl App {
 
                 let mut col = column![
                     row![
-                        text("预设").size(20).color(iced::Color::WHITE),
+                        text("预设").size(20),
                         iced::widget::Space::new().width(Length::Fill),
                         button(text("+ 新建"))
                             .on_press(Message::PresetCreateOpen),
@@ -2328,7 +2357,7 @@ impl App {
                     let desc_input = text_input("描述（可选）", &self.preset_tab.form_description)
                         .on_input(Message::PresetFormDescriptionChanged);
                     let rules_label = row![
-                        text("匹配规则").color(iced::Color::WHITE),
+                        text("匹配规则"),
                         iced::widget::Space::new().width(Length::Fill),
                         button(text("+ 添加规则").size(12))
                             .style(iced::widget::button::text)
@@ -2348,7 +2377,7 @@ impl App {
                     }).collect();
 
                     let mut form_col = column![
-                        text(title).size(16).color(iced::Color::WHITE),
+                        text(title).size(16),
                         name_input,
                         desc_input,
                         rules_label,
@@ -2374,10 +2403,13 @@ impl App {
                     col = col.push(
                         container(form_col.spacing(8).padding(16))
                             .width(Length::Fill)
-                            .style(|_: &iced::Theme| iced::widget::container::Style {
-                                background: Some(iced::Color::from_rgb(0.15, 0.15, 0.15).into()),
-                                border: iced::Border::default().rounded(4),
-                                ..Default::default()
+                            .style(|theme: &iced::Theme| {
+                                let palette = theme.extended_palette();
+                                iced::widget::container::Style {
+                                    background: Some(palette.background.base.color.into()),
+                                    border: iced::Border::default().rounded(4),
+                                    ..Default::default()
+                                }
                             })
                     );
                 }
@@ -2396,10 +2428,13 @@ impl App {
                     col = col.push(
                         container(confirm_col)
                             .width(Length::Fill)
-                            .style(|_: &iced::Theme| iced::widget::container::Style {
-                                background: Some(iced::Color::from_rgb(0.15, 0.15, 0.15).into()),
-                                border: iced::Border::default().rounded(4),
-                                ..Default::default()
+                            .style(|theme: &iced::Theme| {
+                                let palette = theme.extended_palette();
+                                iced::widget::container::Style {
+                                    background: Some(palette.background.base.color.into()),
+                                    border: iced::Border::default().rounded(4),
+                                    ..Default::default()
+                                }
                             })
                     );
                 }
@@ -2407,28 +2442,31 @@ impl App {
                 container(col.spacing(4))
                     .width(Length::Fill)
                     .height(Length::Fill)
-                    .style(|_: &iced::Theme| iced::widget::container::Style {
-                        background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
-                        ..Default::default()
+                    .style(|theme: &iced::Theme| {
+                        let palette = theme.extended_palette();
+                        iced::widget::container::Style {
+                            background: Some(palette.background.weak.color.into()),
+                            ..Default::default()
+                        }
                     })
                     .into()
             }
             TabId::Settings => {
                 let mut col = column![
-                    text("设置").size(20).color(iced::Color::WHITE),
+                    text("设置").size(20),
                     rule::horizontal(1.0),
                     row![
-                        text("配置目录:").color(iced::Color::WHITE),
+                        text("配置目录:"),
                         text(self.settings_tab.config_dir.to_string_lossy().to_string())
-                            .color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                            .color(hint_text),
                     ].spacing(8).padding(8),
                     row![
-                        text("数据目录:").color(iced::Color::WHITE),
+                        text("数据目录:"),
                         iced::widget::text_input("数据目录路径", &self.settings_tab.form_data_dir)
                             .on_input(Message::SettingsFormDataDirChanged),
                     ].spacing(8).padding(8),
                     row![
-                        text("默认预设:").color(iced::Color::WHITE),
+                        text("默认预设:"),
                         {
                             let presets: Vec<String> = self.preset_tab.presets.iter()
                                 .map(|p| p.name.clone())
@@ -2441,7 +2479,7 @@ impl App {
                         },
                     ].spacing(8).padding(8),
                     row![
-                        text("主题:").color(iced::Color::WHITE),
+                        text("主题:"),
                         iced::widget::pick_list(
                             vec![
                                 AppTheme::Light,
@@ -2477,9 +2515,12 @@ impl App {
                 container(col)
                     .width(Length::Fill)
                     .height(Length::Fill)
-                    .style(|_: &iced::Theme| iced::widget::container::Style {
-                        background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
-                        ..Default::default()
+                    .style(|theme: &iced::Theme| {
+                        let palette = theme.extended_palette();
+                        iced::widget::container::Style {
+                            background: Some(palette.background.weak.color.into()),
+                            ..Default::default()
+                        }
                     })
                     .into()
             }
@@ -2662,7 +2703,7 @@ impl App {
                         let presets: Vec<String> = self.preset_tab.presets.iter()
                             .map(|p| p.name.clone())
                             .collect();
-                        (simple_edit_card_view(form, &presets), (Message::EditCardConfirm, "保存", true))
+                        (simple_edit_card_view(form, &presets, hint_text), (Message::EditCardConfirm, "保存", true))
                     } else {
                         (text("开发中").color(iced::Color::WHITE).into(), (Message::ModalClose, "关闭", false))
                     }
@@ -2674,10 +2715,10 @@ impl App {
                             text_input("分类树名称", &self.category_tab.new_tree_name)
                                 .on_input(Message::CreateTreeNameChanged),
                             Space::new().height(8),
-                            text("从 Obsidian 导入（可选）:").color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                            text("从 Obsidian 导入（可选）:").color(hint_text),
                             text_input("Obsidian 仓库路径", &self.category_tab.new_tree_import_path)
                                 .on_input(Message::CreateTreeImportPathChanged),
-                            text("忽略规则文件（可选）:").color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                            text("忽略规则文件（可选）:").color(hint_text),
                             text_input("规则文件路径，留空使用默认", &self.category_tab.new_tree_import_rules_path)
                                 .on_input(Message::CreateTreeImportRulesPathChanged),
                         ]
@@ -2716,13 +2757,13 @@ impl App {
     }
 }
 
-fn simple_edit_card_view(form: &category_tab::EditCardForm, presets: &[String]) -> Element<'static, Message> {
+fn simple_edit_card_view(form: &category_tab::EditCardForm, presets: &[String], hint_text: iced::Color) -> Element<'static, Message> {
     let presets_owned = presets.to_vec();
     let new_name = form.new_name.clone();
     let preset = form.preset.clone();
     
     let review_list: Element<Message> = if form.review_records.is_empty() {
-        text("暂无复习记录").color(iced::Color::from_rgb(0.6, 0.6, 0.6)).into()
+        text("暂无复习记录").color(hint_text).into()
     } else {
         column(
             form.review_records.iter().enumerate().map(|(i, r)| {
@@ -2771,7 +2812,7 @@ fn simple_edit_card_view(form: &category_tab::EditCardForm, presets: &[String]) 
             if let Some(next) = form.next_review {
                 text(next.format("%Y-%m-%d").to_string()).color(iced::Color::from_rgb(0.5, 0.8, 0.5))
             } else {
-                text("未设置").color(iced::Color::from_rgb(0.6, 0.6, 0.6))
+                text("未设置").color(hint_text)
             },
             button(text("清除").color(iced::Color::WHITE).size(12))
                 .on_press(Message::EditCardClearPrediction)
@@ -3033,13 +3074,16 @@ fn build_link_timer_modal(
         )
         .height(Length::Fixed(200.0))
     )
-    .style(|_| container::Style {
-        background: Some(Color::from_rgb(0.15, 0.15, 0.15).into()),
-        ..Default::default()
+    .style(|theme: &iced::Theme| {
+        let palette = theme.extended_palette();
+        container::Style {
+            background: Some(palette.background.base.color.into()),
+            ..Default::default()
+        }
     })
     .padding(8)
     .into();
-    
+
     let type_options = [
         (NodeType::Folder, "目录"),
         (NodeType::Card, "学习卡片"),
@@ -3113,9 +3157,12 @@ fn build_link_timer_modal(
     
     container(col)
         .padding(24)
-        .style(|_| container::Style {
-            background: Some(Color::from_rgb(0.2, 0.2, 0.2).into()),
-            ..Default::default()
+        .style(|theme: &iced::Theme| {
+            let palette = theme.extended_palette();
+            container::Style {
+                background: Some(palette.background.weak.color.into()),
+                ..Default::default()
+            }
         })
         .into()
 }
@@ -3162,7 +3209,7 @@ fn quality_button(label: &'static str, quality: crate::data::models::MemoryQuali
         })
         .into()
 }
-fn review_detail_panel(path: &str, _card: &Card, stats: &review_tab::CardStats) -> Element<'static, Message> {
+fn review_detail_panel(path: &str, _card: &Card, stats: &review_tab::CardStats, hint_text: iced::Color) -> Element<'static, Message> {
     let path_display = path.split('/')
         .collect::<Vec<_>>()
         .join(" > ");
@@ -3183,29 +3230,29 @@ fn review_detail_panel(path: &str, _card: &Card, stats: &review_tab::CardStats) 
     let path_str = path.to_string();
     container(
         column![
-            text(path_display).color(iced::Color::from_rgb(0.7, 0.7, 0.7)).size(12),
+            text(path_display).color(hint_text).size(12),
             Space::new().height(16),
             
             row![
-                text("会话: ").color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                text("会话: ").color(hint_text),
                 text(format!("{} 次", stats.sessions)).color(iced::Color::WHITE),
             ],
             row![
-                text("时长: ").color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                text("时长: ").color(hint_text),
                 text(format!("{}h {}m", total_hours, total_mins)).color(iced::Color::WHITE),
             ],
             row![
-                text("平均: ").color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                text("平均: ").color(hint_text),
                 text(format!("{} 分钟", avg_min)).color(iced::Color::WHITE),
             ],
             Space::new().height(8),
             
             row![
-                text("上次: ").color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                text("上次: ").color(hint_text),
                 text(last_review).color(iced::Color::WHITE),
             ],
             row![
-                text("下次: ").color(iced::Color::from_rgb(0.6, 0.6, 0.6)),
+                text("下次: ").color(hint_text),
                 text(next_review).color(iced::Color::WHITE),
             ],
             Space::new().height(24),
@@ -3241,9 +3288,12 @@ fn review_detail_panel(path: &str, _card: &Card, stats: &review_tab::CardStats) 
     .width(Length::Fill)
     .height(Length::Fill)
     .padding(16)
-    .style(|_| iced::widget::container::Style {
-        background: Some(iced::Color::from_rgb(0.2, 0.2, 0.2).into()),
-        ..Default::default()
+    .style(|theme: &iced::Theme| {
+        let palette = theme.extended_palette();
+        iced::widget::container::Style {
+            background: Some(palette.background.weak.color.into()),
+            ..Default::default()
+        }
     })
     .into()
 }

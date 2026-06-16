@@ -13,9 +13,9 @@ impl NewNodeModal {
         let presets_owned = presets.to_vec();
         
         let path_preview = row![
-            text("在 ").color(iced::Color::from_rgb(0.7, 0.7, 0.7)),
+            text("在 "),
             text(format!("\"{}\"", parent_path)).color(iced::Color::from_rgb(0.3, 0.7, 0.9)),
-            text(" 下创建").color(iced::Color::from_rgb(0.7, 0.7, 0.7)),
+            text(" 下创建"),
         ];
         
         let type_selector = row![
@@ -41,7 +41,7 @@ impl NewNodeModal {
         let preset_selector = if form.node_type == NodeType::Card {
             Some(
                 column![
-                    text("预设:").color(iced::Color::WHITE),
+                    text("预设:"),
                     pick_list(presets_owned, Some(preset), Message::NewNodePresetChanged)
                         .width(Length::Fill),
                 ]
@@ -54,10 +54,10 @@ impl NewNodeModal {
         let mut content = column![
             path_preview,
             Space::new().height(16),
-            text("类型:").color(iced::Color::WHITE),
+            text("类型:"),
             type_selector,
             Space::new().height(12),
-            text("名称:").color(iced::Color::WHITE),
+            text("名称:"),
             name_input,
         ]
         .spacing(4);

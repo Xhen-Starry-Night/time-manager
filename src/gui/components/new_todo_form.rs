@@ -1,5 +1,5 @@
 use iced::widget::{column, row, text, text_input, radio, Space};
-use iced::{Element, Length, Color};
+use iced::{Element, Length};
 use crate::gui::Message;
 
 pub struct NewTodoForm;
@@ -16,12 +16,12 @@ impl NewTodoForm {
         due_minute: &str,
         tags: &str,
     ) -> Element<'a, Message> {
-        let content_label = text("内容 *").color(Color::WHITE);
+        let content_label = text("内容 *");
         let content_input = text_input("输入待办内容...", content)
             .on_input(Message::NewTodoContentChanged)
             .width(Length::Fill);
         
-        let priority_label = text("优先级").color(Color::WHITE);
+        let priority_label = text("优先级");
         let priority_none = radio(
             "无",
             None,
@@ -55,7 +55,7 @@ impl NewTodoForm {
         ]
         .spacing(12);
         
-        let due_label = text("截止日期").color(Color::WHITE);
+        let due_label = text("截止日期");
         
         let year_input = text_input("年", due_year)
             .on_input(Message::NewTodoDueYearChanged)
@@ -75,23 +75,23 @@ impl NewTodoForm {
         
         let due_row = row![
             year_input,
-            text("-").color(Color::WHITE),
+            text("-"),
             month_input,
-            text("-").color(Color::WHITE),
+            text("-"),
             day_input,
-            text("  ").color(Color::WHITE),
+            text("  "),
             hour_input,
-            text(":").color(Color::WHITE),
+            text(":"),
             minute_input,
         ]
         .spacing(4)
         .align_y(iced::Alignment::Center);
         
-        let tags_label = text("标签").color(Color::WHITE);
+        let tags_label = text("标签");
         let tags_input = text_input("多个标签用空格分隔...", tags)
             .on_input(Message::NewTodoTagsChanged)
             .width(Length::Fill);
-        let tags_hint = text("示例: 工作 紧急").color(Color::from_rgb(0.5, 0.5, 0.5));
+        let tags_hint = text("示例: 工作 紧急");
         
         column![
             content_label,
