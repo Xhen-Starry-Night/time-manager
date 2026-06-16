@@ -52,20 +52,20 @@ impl AppTheme {
         }
     }
 
-    pub fn default() -> Self {
+    pub fn platform_default() -> Self {
         #[cfg(target_os = "windows")]
         { Self::Light }
         #[cfg(not(target_os = "windows"))]
         { Self::Transparent }
     }
 
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s {
             "light" => Self::Light,
             "dark" => Self::Dark,
             #[cfg(target_os = "linux")]
             "transparent" => Self::Transparent,
-            _ => Self::default(),
+            _ => Self::platform_default(),
         }
     }
 
@@ -76,5 +76,11 @@ impl AppTheme {
             #[cfg(target_os = "linux")]
             Self::Transparent => "transparent",
         }
+    }
+}
+
+impl std::fmt::Display for AppTheme {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.display())
     }
 }

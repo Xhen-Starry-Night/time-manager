@@ -10,6 +10,7 @@ use crate::data::config::Config;
 use crate::data::DataFs;
 use crate::data::models::{Card, Preset, Todo};
 use crate::gui::{Message, TabId, Modal, DataSnapshot, NodeType};
+use crate::gui::styles::AppTheme;
 use crate::gui::components::{tree_view::TreeNode, ModalView, NewTodoForm, NewNodeModal};
 use crate::timer::TimerManager;
 
@@ -31,6 +32,7 @@ use settings_tab::SettingsTabState;
 
 pub struct App {
     pub default_preset: String,
+    pub theme: AppTheme,
     active_tab: TabId,
     data_dir: PathBuf,
     data_fs: DataFs,
@@ -67,6 +69,7 @@ impl App {
                     .unwrap_or(data_dir);
                 let default_preset = config.default_preset.clone()
                     .unwrap_or_else(|| "default".into());
+                let theme = config.theme.as_deref().map(AppTheme::parse).unwrap_or_else(AppTheme::platform_default);
                 
                 let data_fs = DataFs::init(data_dir.clone()).expect("Failed to init data dir");
                 let timer_manager = TimerManager::new(data_dir.clone());
@@ -75,6 +78,7 @@ impl App {
                 let timer_tab = TimerTabState::new(timer_manager.get_state().clone(), &default_preset);
                 let state = App {
                     default_preset,
+                    theme,
                     active_tab: TabId::Category,
                     data_dir: data_dir.clone(),
                     data_fs: (*data_fs_arc).clone(),
@@ -90,6 +94,7 @@ impl App {
                         Config::config_path(),
                         config,
                         &data_dir.to_string_lossy(),
+                        theme,
                     ),
                     
                     timer_manager,
@@ -120,7 +125,13 @@ impl App {
             App::update,
             App::view,
         )
+        .window(iced::window::Settings {
+            #[cfg(target_os = "linux")]
+            transparent: true,
+            ..Default::default()
+        })
         .title(App::title)
+        .theme(|app: &App| app.theme.to_iced_theme())
         .subscription(App::subscription)
         .run()
     }
@@ -377,7 +388,7 @@ impl App {
                 let new_config = crate::data::config::Config {
                     data_dir: if data_dir_val.is_empty() { None } else { Some(data_dir_val.clone()) },
                     default_preset: if default_preset_val.is_empty() { None } else { Some(default_preset_val.clone()) },
-                    theme: None,
+                    theme: self.settings_tab.config.theme.clone(),
                 };
 
                 let path = self.settings_tab.config_path.clone();
@@ -407,6 +418,16 @@ impl App {
 
             Message::SettingsFormDismissMessage => {
                 self.settings_tab.dismiss_message();
+                Task::none()
+            }
+
+            Message::ThemeChanged(theme) => {
+                self.theme = theme;
+                self.settings_tab.form_theme = theme;
+                self.settings_tab.config.theme = Some(theme.as_str().to_string());
+                let path = self.settings_tab.config_path.clone();
+                let config = self.settings_tab.config.clone();
+                let _ = config.save(&path);
                 Task::none()
             }
 
@@ -2418,6 +2439,19 @@ impl App {
                                 Message::SettingsFormDefaultPresetChanged,
                             )
                         },
+                    ].spacing(8).padding(8),
+                    row![
+                        text("主题:").color(iced::Color::WHITE),
+                        iced::widget::pick_list(
+                            vec![
+                                AppTheme::Light,
+                                AppTheme::Dark,
+                                #[cfg(target_os = "linux")]
+                                AppTheme::Transparent,
+                            ],
+                            Some(self.theme),
+                            Message::ThemeChanged,
+                        ),
                     ].spacing(8).padding(8),
                     iced::widget::button(iced::widget::text("保存"))
                         .on_press(Message::SettingsFormSaveRequested)

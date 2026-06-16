@@ -3,6 +3,7 @@ use uuid::Uuid;
 
 use crate::data::DataError;
 use crate::data::models::{Card, Preset, Todo, MemoryQuality};
+use crate::gui::styles::AppTheme;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeType {
@@ -135,6 +136,8 @@ pub enum Message {
     SettingsFormDefaultPresetChanged(String),
     SettingsFormSaveRequested,
     SettingsFormDismissMessage,
+
+    ThemeChanged(AppTheme),
 
     Error(String),
     ClearError,
