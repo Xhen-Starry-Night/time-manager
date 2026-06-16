@@ -1650,7 +1650,7 @@ impl App {
                                     button(
                                         row![
                                             text(format!("{} {}", icon, result.name))
-                                                .color(iced::Color::WHITE)
+                                                .color(palette.background.base.text)
                                                 .size(14),
                                         ]
                                         .spacing(4)
@@ -1844,7 +1844,6 @@ impl App {
                     container(
                         text("暂无需要复习的卡片")
                             .size(16)
-                            .color(iced::Color::WHITE)
                     )
                     .width(Length::Fill)
                     .height(Length::Fill)
@@ -2064,7 +2063,6 @@ impl App {
                     container(
                         text("暂无待办事项")
                             .size(16)
-                            .color(iced::Color::WHITE)
                     )
                     .width(Length::Fill)
                     .height(Length::Fill)
@@ -2197,7 +2195,6 @@ impl App {
                     container(
                         text("暂无日程安排")
                             .size(16)
-                            .color(iced::Color::WHITE)
                     )
                     .width(Length::Fill)
                     .height(Length::Fill)
@@ -2245,7 +2242,7 @@ impl App {
                                                 Space::new().width(Length::Fixed(8.0)),
                                                 text(time_range).color(hint_text).size(13),
                                                 Space::new().width(Length::Fixed(8.0)),
-                                                text(&schedule.summary).color(iced::Color::WHITE).size(14),
+                                                text(&schedule.summary).size(14),
                                             ],
                                             {
                                                 let loc_elem: Element<Message> = if !location_text.is_empty() {
@@ -2310,7 +2307,7 @@ impl App {
                             "未训练".to_string()
                         };
                         row![
-                            text(preset.name.clone()).color(iced::Color::WHITE).width(Length::Fill),
+                            text(preset.name.clone()).width(Length::Fill),
                             text(trained).color(hint_text),
                             button(text("编辑").size(12))
                                 .style(iced::widget::button::text)
@@ -2417,7 +2414,7 @@ impl App {
                 // delete confirm overlay
                 if let Some(ref target) = self.preset_tab.delete_target {
                     let confirm_col = column![
-                        text(format!("确定删除预设「{target}」？")).color(iced::Color::WHITE),
+                        text(format!("确定删除预设「{target}」？")),
                         row![
                             iced::widget::Space::new().width(Length::Fill),
                             button(text("取消")).on_press(Message::PresetDeleteDismissed),
@@ -2575,7 +2572,6 @@ impl App {
                     (
                         column![
                             text(format!("确定要删除 \"{}\" 吗？", item))
-                                .color(iced::Color::WHITE)
                                 .size(16),
                             Space::new().height(12),
                             text(warning)
@@ -2603,7 +2599,6 @@ impl App {
                     (
                         column![
                             text("错误")
-                                .color(iced::Color::WHITE)
                                 .size(16),
                             text(message.clone())
                                 .color(iced::Color::from_rgb(0.9, 0.3, 0.2)),
@@ -2620,13 +2615,13 @@ impl App {
 
                     let content = column![
                         row![
-                            text("标题:").color(iced::Color::WHITE),
+                            text("标题:"),
                             text_input("日程标题", &form.summary)
                                 .on_input(Message::ScheduleFormSummaryChanged)
                                 .width(Length::Fill),
                         ].spacing(8).padding(4),
                         row![
-                            text("开始:").color(iced::Color::WHITE),
+                            text("开始:").color(hint_text),
                             text_input("日期", &form.start_date)
                                 .on_input(Message::ScheduleFormStartDateChanged)
                                 .width(Length::Fixed(120.0)),
@@ -2636,7 +2631,7 @@ impl App {
                                 .width(Length::Fixed(80.0)),
                         ].spacing(8).padding(4),
                         row![
-                            text("结束:").color(iced::Color::WHITE),
+                            text("结束:").color(hint_text),
                             text_input("日期", &form.end_date)
                                 .on_input(Message::ScheduleFormEndDateChanged)
                                 .width(Length::Fixed(120.0)),
@@ -2646,25 +2641,25 @@ impl App {
                                 .width(Length::Fixed(80.0)),
                         ].spacing(8).padding(4),
                         row![
-                            text("地点:").color(iced::Color::WHITE),
+                            text("地点:").color(hint_text),
                             text_input("可选", &form.location)
                                 .on_input(Message::ScheduleFormLocationChanged)
                                 .width(Length::Fill),
                         ].spacing(8).padding(4),
                         row![
-                            text("描述:").color(iced::Color::WHITE),
+                            text("描述:").color(hint_text),
                             text_input("可选", &form.description)
                                 .on_input(Message::ScheduleFormDescriptionChanged)
                                 .width(Length::Fill),
                         ].spacing(8).padding(4),
                         row![
-                            text("提醒:").color(iced::Color::WHITE),
+                            text("提醒:").color(hint_text),
                             text_input("分钟前", &form.reminder)
                                 .on_input(Message::ScheduleFormReminderChanged)
                                 .width(Length::Fixed(80.0)),
                         ].spacing(8).padding(4),
                         row![
-                            text("重复:").color(iced::Color::WHITE),
+                            text("重复:").color(hint_text),
                             pick_list(rrule_options, Some(form.rrule.as_str().to_string()), move |s| {
                                 Message::ScheduleFormRruleChanged(RecurrenceRule::parse(&s))
                             }).width(Length::Fixed(100.0)),
@@ -2695,7 +2690,7 @@ impl App {
                             .collect();
                         (NewNodeModal::view(form, &presets), (Message::NewNodeConfirm, "创建", true))
                     } else {
-                        (text("开发中").color(iced::Color::WHITE).into(), (Message::ModalClose, "关闭", false))
+                        (text("开发中").into(), (Message::ModalClose, "关闭", false))
                     }
                 }
                 Modal::EditCard { .. } => {
@@ -2705,13 +2700,13 @@ impl App {
                             .collect();
                         (simple_edit_card_view(form, &presets, hint_text), (Message::EditCardConfirm, "保存", true))
                     } else {
-                        (text("开发中").color(iced::Color::WHITE).into(), (Message::ModalClose, "关闭", false))
+                        (text("开发中").into(), (Message::ModalClose, "关闭", false))
                     }
                 }
                 Modal::CreateTree => {
                     (
                         column![
-                            text("输入新分类树名称:").color(iced::Color::WHITE),
+                            text("输入新分类树名称:"),
                             text_input("分类树名称", &self.category_tab.new_tree_name)
                                 .on_input(Message::CreateTreeNameChanged),
                             Space::new().height(8),
@@ -2727,7 +2722,7 @@ impl App {
                         (Message::ModalConfirm, "创建", true),
                     )
                 }
-                _ => (text("开发中").color(iced::Color::WHITE).into(), (Message::ModalClose, "关闭", false))
+                _ => (text("开发中").into(), (Message::ModalClose, "关闭", false))
             };
             
             let (on_confirm, confirm_label, show_cancel) = on_confirm_tuple;
@@ -2772,9 +2767,9 @@ fn simple_edit_card_view(form: &category_tab::EditCardForm, presets: &[String], 
                 let quality = r.memory_quality.as_str();
                 
                 row![
-                    text(timestamp).color(iced::Color::WHITE).width(Length::Fixed(100.0)),
-                    text(format!("{}分", duration)).color(iced::Color::WHITE).width(Length::Fixed(60.0)),
-                    text(quality).color(iced::Color::WHITE).width(Length::Fixed(60.0)),
+                    text(timestamp).width(Length::Fixed(100.0)),
+                    text(format!("{}分", duration)).width(Length::Fixed(60.0)),
+                    text(quality).width(Length::Fixed(60.0)),
                     button(text("×").color(iced::Color::WHITE))
                         .on_press(Message::EditCardRemoveReview(i))
                         .style(|_, _| iced::widget::button::Style {
@@ -2796,18 +2791,18 @@ fn simple_edit_card_view(form: &category_tab::EditCardForm, presets: &[String], 
     };
     
     column![
-        text("名称:").color(iced::Color::WHITE),
+        text("名称:"),
         text_input("名称", &new_name)
             .on_input(Message::EditCardNameChanged)
             .width(Length::Fill),
         Space::new().height(12),
         
-        text("预设:").color(iced::Color::WHITE),
+        text("预设:"),
         pick_list(presets_owned, Some(preset), Message::EditCardPresetChanged)
             .width(Length::Fill),
         Space::new().height(12),
         
-        text("下次复习:").color(iced::Color::WHITE),
+        text("下次复习:"),
         row![
             if let Some(next) = form.next_review {
                 text(next.format("%Y-%m-%d").to_string()).color(iced::Color::from_rgb(0.5, 0.8, 0.5))
@@ -2840,11 +2835,11 @@ fn simple_edit_card_view(form: &category_tab::EditCardForm, presets: &[String], 
         .spacing(8),
         Space::new().height(12),
         
-        text(format!("复习记录 ({} 条)", form.review_records.len())).color(iced::Color::WHITE),
+        text(format!("复习记录 ({} 条)", form.review_records.len())),
         review_list,
         Space::new().height(8),
         
-        text("添加新记录:").color(iced::Color::WHITE),
+        text("添加新记录:"),
         row![
             text_input("时长(分钟)", &form.new_review_duration)
                 .on_input(Message::EditCardNewReviewDurationChanged)
@@ -3235,25 +3230,25 @@ fn review_detail_panel(path: &str, _card: &Card, stats: &review_tab::CardStats, 
             
             row![
                 text("会话: ").color(hint_text),
-                text(format!("{} 次", stats.sessions)).color(iced::Color::WHITE),
+                text(format!("{} 次", stats.sessions)),
             ],
             row![
                 text("时长: ").color(hint_text),
-                text(format!("{}h {}m", total_hours, total_mins)).color(iced::Color::WHITE),
+                text(format!("{}h {}m", total_hours, total_mins)),
             ],
             row![
                 text("平均: ").color(hint_text),
-                text(format!("{} 分钟", avg_min)).color(iced::Color::WHITE),
+                text(format!("{} 分钟", avg_min)),
             ],
             Space::new().height(8),
             
             row![
                 text("上次: ").color(hint_text),
-                text(last_review).color(iced::Color::WHITE),
+                text(last_review),
             ],
             row![
                 text("下次: ").color(hint_text),
-                text(next_review).color(iced::Color::WHITE),
+                text(next_review),
             ],
             Space::new().height(24),
             

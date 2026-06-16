@@ -44,7 +44,10 @@ impl TreeView {
                         ..Default::default()
                     }
                 } else {
-                    iced::widget::button::Style::default()
+                    iced::widget::button::Style {
+                        text_color: palette.background.base.text,
+                        ..Default::default()
+                    }
                 }
             })
             .width(Length::Fill);

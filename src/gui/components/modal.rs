@@ -33,7 +33,7 @@ impl ModalView {
             });
 
         let header = row![
-            text(title).size(18).color(Color::WHITE),
+            text(title).size(18),
             Space::new().width(Length::Fill),
             close_btn,
         ]

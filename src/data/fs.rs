@@ -136,6 +136,7 @@ impl DataFs {
                     .ok()?;
                 let card_path_str = card_path
                     .to_string_lossy()
+                    .replace('\\', "/")
                     .replace(".json", "");
                 
                 let json = std::fs::read_to_string(path).ok()?;

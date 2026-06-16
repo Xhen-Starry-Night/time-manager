@@ -1,6 +1,6 @@
 {
-  "pid": 6522,
+  "pid": 16800,
   "version": "0.9.6",
   "socketPath": "/home/starry/Develop/Rust/time-manager/.codegraph/daemon.sock",
-  "startedAt": 1781578554343
+  "startedAt": 1781582292028
 }
