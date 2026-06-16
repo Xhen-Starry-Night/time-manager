@@ -7,6 +7,7 @@ use crate::data::{DataError, Result};
 pub struct Config {
     pub data_dir: Option<String>,
     pub default_preset: Option<String>,
+    pub theme: Option<String>,
 }
 
 impl Config {

@@ -445,6 +445,7 @@ fn test_config_load_save() {
     let config = time_manager::data::config::Config {
         data_dir: Some("/tmp/data".to_string()),
         default_preset: Some("english".to_string()),
+        theme: None,
     };
     config.save(&config_path).unwrap();
 

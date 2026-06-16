@@ -377,6 +377,7 @@ impl App {
                 let new_config = crate::data::config::Config {
                     data_dir: if data_dir_val.is_empty() { None } else { Some(data_dir_val.clone()) },
                     default_preset: if default_preset_val.is_empty() { None } else { Some(default_preset_val.clone()) },
+                    theme: None,
                 };
 
                 let path = self.settings_tab.config_path.clone();
